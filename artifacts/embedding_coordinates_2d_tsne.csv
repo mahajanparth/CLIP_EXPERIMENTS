@@ -1,0 +1,25 @@
+ID,Label,Category,Modality,Description,X,Y
+photo_cat,cat,Animals,Image,a photo of a cat,-7.864971,-12.288107
+commons_dog_192179542,dog,Animals,Image,a photo of a dog,-8.441456,-11.733588
+commons_dog_7179352,dog,Animals,Image,a photo of a dog,-8.462392,-12.149012
+commons_dog_21252737,dog,Animals,Image,a photo of a dog,-9.082911,-12.072957
+photo_rocket,rocket,Vehicles,Image,a photo of a rocket,-6.827721,-10.303475
+commons_car_143599498,car,Vehicles,Image,a photo of a car,-6.9851317,-8.286904
+commons_bicycle_148796159,bicycle,Vehicles,Image,a photo of a bicycle,-6.574563,-13.421297
+commons_car_143599504,car,Vehicles,Image,a photo of a car,-6.9843073,-8.3169155
+photo_coffee,coffee,Food,Image,a photo of a coffee,-6.6686287,-12.793737
+commons_pizza_106092414,pizza,Food,Image,a photo of a pizza,-5.446295,-12.142991
+commons_apple_97125534,apple,Food,Image,a photo of apples,-6.5441275,-11.66119
+commons_pizza_108799064,pizza,Food,Image,a photo of a pizza,-5.8257194,-12.266376
+photo_cat,cat,Animals,Text,a photo of a cat,-9.57722,2.169426
+commons_dog_192179542,dog,Animals,Text,a photo of a dog,-10.216181,1.4234166
+commons_dog_7179352,dog,Animals,Text,a photo of a dog,-10.216181,1.4234166
+commons_dog_21252737,dog,Animals,Text,a photo of a dog,-10.216181,1.4234166
+photo_rocket,rocket,Vehicles,Text,a photo of a rocket,-10.063131,-0.18968822
+commons_car_143599498,car,Vehicles,Text,a photo of a car,-8.757807,0.40882966
+commons_bicycle_148796159,bicycle,Vehicles,Text,a photo of a bicycle,-8.234892,1.2710017
+commons_car_143599504,car,Vehicles,Text,a photo of a car,-8.757807,0.40882966
+photo_coffee,coffee,Food,Text,a photo of a coffee,-10.574162,2.7963207
+commons_pizza_106092414,pizza,Food,Text,a photo of a pizza,-12.055181,0.56804943
+commons_apple_97125534,apple,Food,Text,a photo of apples,-11.770268,2.4271646
+commons_pizza_108799064,pizza,Food,Text,a photo of a pizza,-12.055181,0.56804943

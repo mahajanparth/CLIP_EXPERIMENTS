@@ -1,0 +1,4 @@
+experiment,examples,accuracy,mean_margin
+Attribute binding,30,0.5,-0.0004742274681727091
+Counting,30,0.7333333333333333,0.008864631752173106
+Spatial relationships,30,0.5,0.00021743178367614747

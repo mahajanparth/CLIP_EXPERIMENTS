@@ -1,0 +1,63 @@
+{
+  "PCA": {
+    "dimensions": 2,
+    "input_shape": [
+      24,
+      512
+    ],
+    "output_shape": [
+      24,
+      2
+    ],
+    "seed": 2021,
+    "asset_ids": [
+      "photo_cat",
+      "commons_dog_192179542",
+      "commons_dog_7179352",
+      "commons_dog_21252737",
+      "photo_rocket",
+      "commons_car_143599498",
+      "commons_bicycle_148796159",
+      "commons_car_143599504",
+      "photo_coffee",
+      "commons_pizza_106092414",
+      "commons_apple_97125534",
+      "commons_pizza_108799064"
+    ],
+    "explained_variance_ratio": [
+      0.4588826767577822,
+      0.11721222528939881
+    ],
+    "perplexity": null,
+    "fit": "Joint image and text embeddings; independently fitted in 2D"
+  },
+  "t-SNE": {
+    "dimensions": 2,
+    "input_shape": [
+      24,
+      512
+    ],
+    "output_shape": [
+      24,
+      2
+    ],
+    "seed": 2021,
+    "asset_ids": [
+      "photo_cat",
+      "commons_dog_192179542",
+      "commons_dog_7179352",
+      "commons_dog_21252737",
+      "photo_rocket",
+      "commons_car_143599498",
+      "commons_bicycle_148796159",
+      "commons_car_143599504",
+      "photo_coffee",
+      "commons_pizza_106092414",
+      "commons_apple_97125534",
+      "commons_pizza_108799064"
+    ],
+    "explained_variance_ratio": null,
+    "perplexity": 8.0,
+    "fit": "Joint image and text embeddings; independently fitted in 2D"
+  }
+}

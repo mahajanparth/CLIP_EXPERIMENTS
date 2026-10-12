@@ -1,0 +1,25 @@
+ID,Label,Category,Modality,Description,X,Y
+photo_cat,cat,Animals,Image,a photo of a cat,-0.5561544723848152,0.2760498798384369
+commons_dog_192179542,dog,Animals,Image,a photo of a dog,-0.5607451112406747,0.2981200596835307
+commons_dog_7179352,dog,Animals,Image,a photo of a dog,-0.5520756166976422,0.3551815779330119
+commons_dog_21252737,dog,Animals,Image,a photo of a dog,-0.47978277957349724,0.39181454253075093
+photo_rocket,rocket,Vehicles,Image,a photo of a rocket,-0.4441884565982694,-0.2567514799545009
+commons_car_143599498,car,Vehicles,Image,a photo of a car,-0.42163550224400814,-0.7134603787873677
+commons_bicycle_148796159,bicycle,Vehicles,Image,a photo of a bicycle,-0.4739012546780361,-0.009535491032956691
+commons_car_143599504,car,Vehicles,Image,a photo of a car,-0.4205289461160326,-0.6835047929334161
+photo_coffee,coffee,Food,Image,a photo of a coffee,-0.5525397382928895,0.08764352085445784
+commons_pizza_106092414,pizza,Food,Image,a photo of a pizza,-0.5078018081947102,-0.031041411842658087
+commons_apple_97125534,apple,Food,Image,a photo of apples,-0.535093950846574,0.05438082628723871
+commons_pizza_108799064,pizza,Food,Image,a photo of a pizza,-0.5016773784142081,0.057422524526506924
+photo_cat,cat,Animals,Text,a photo of a cat,0.5171232169464559,0.04399643892222156
+commons_dog_192179542,dog,Animals,Text,a photo of a dog,0.5200057496382803,0.08370113152329081
+commons_dog_7179352,dog,Animals,Text,a photo of a dog,0.5200057496382803,0.08370113152329085
+commons_dog_21252737,dog,Animals,Text,a photo of a dog,0.5200057496382803,0.08370113152329085
+photo_rocket,rocket,Vehicles,Text,a photo of a rocket,0.4758619052217701,-0.03896275399024768
+commons_car_143599498,car,Vehicles,Text,a photo of a car,0.5156347305435227,-0.08794549315003632
+commons_bicycle_148796159,bicycle,Vehicles,Text,a photo of a bicycle,0.4983396470488348,-0.009548244590973984
+commons_car_143599504,car,Vehicles,Text,a photo of a car,0.5156347305435227,-0.08794549315003629
+photo_coffee,coffee,Food,Text,a photo of a coffee,0.4879476384191264,0.02520710489823493
+commons_pizza_106092414,pizza,Food,Text,a photo of a pizza,0.49001038570233263,0.021149891611166257
+commons_apple_97125534,apple,Food,Text,a photo of apples,0.45554512623861887,0.03547588616559892
+commons_pizza_108799064,pizza,Food,Text,a photo of a pizza,0.49001038570233263,0.021149891611166222

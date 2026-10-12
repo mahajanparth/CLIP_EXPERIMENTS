@@ -1,0 +1,12 @@
+# Original OpenAI implementation, pinned to an upstream revision.
+clip @ git+https://github.com/openai/CLIP.git@a1d071733d7111c9c014f024669f959182114e33
+streamlit>=1.49,<2
+torch>=2.2,<3
+torchvision>=0.17,<1
+Pillow>=10,<13
+numpy>=1.26,<3
+pandas>=2,<4
+plotly>=5.20,<7
+matplotlib>=3.8,<4  # Typeset math as standalone vector paths in SVG diagrams
+scikit-learn>=1.5,<2
+pytest>=8,<10
