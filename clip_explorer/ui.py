@@ -28,8 +28,8 @@ def lines(text: str, max_count: int = 40) -> list[str]:
     return entries
 
 
-def select_image(key: str) -> tuple[Image.Image, dict | None]:
-    gallery = photographic_gallery()
+def select_image(key: str, gallery: list[dict] | None = None) -> tuple[Image.Image, dict | None]:
+    gallery = photographic_gallery() if gallery is None else gallery
     # Prefer the public-domain cat photo, when downloaded, for the default demo.
     preferred = 'dog' if key == 'prompt' else 'cat'
     gallery = sorted(gallery,key=lambda r:r['label']!=preferred)

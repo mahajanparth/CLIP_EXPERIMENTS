@@ -1,0 +1,110 @@
+{
+  "grid": [
+    7,
+    7
+  ],
+  "patch_size": [
+    32,
+    32
+  ],
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "hidden_width": 768,
+  "output_width": 512,
+  "model": "ViT-B/32",
+  "model_revision": "a1d071733d7111c9c014f024669f959182114e33",
+  "image": {
+    "id": "photo_cat",
+    "file": "gallery/chelsea.png",
+    "label": "cat",
+    "category": "Animals",
+    "caption": "a photo of a cat",
+    "medium": "photograph",
+    "source": "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.19.3/skimage/data/chelsea.png",
+    "author": "Stefan van der Walt",
+    "license": "CC0-1.0",
+    "license_evidence": "https://github.com/scikit-image/scikit-image/blob/v0.19.3/skimage/data/_fetchers.py",
+    "sha256": "596aa1e7cb875eb79f437e310381d26b338a81c2da23439704a73c4651e8c4bb"
+  },
+  "prompt": "a photo of a cat",
+  "cosine": 0.28273826837539673,
+  "stages": {
+    "Patch projection": [
+      49,
+      768
+    ],
+    "Class + patches + position": [
+      50,
+      768
+    ],
+    "Pre-transformer layer norm": [
+      50,
+      768
+    ],
+    "Vision block 1": [
+      50,
+      768
+    ],
+    "Vision block 2": [
+      50,
+      768
+    ],
+    "Vision block 3": [
+      50,
+      768
+    ],
+    "Vision block 4": [
+      50,
+      768
+    ],
+    "Vision block 5": [
+      50,
+      768
+    ],
+    "Vision block 6": [
+      50,
+      768
+    ],
+    "Vision block 7": [
+      50,
+      768
+    ],
+    "Vision block 8": [
+      50,
+      768
+    ],
+    "Vision block 9": [
+      50,
+      768
+    ],
+    "Vision block 10": [
+      50,
+      768
+    ],
+    "Vision block 11": [
+      50,
+      768
+    ],
+    "Vision block 12": [
+      50,
+      768
+    ],
+    "Final class layer norm": [
+      1,
+      768
+    ],
+    "Projected class vector": [
+      1,
+      512
+    ],
+    "Normalized CLIP vector": [
+      1,
+      512
+    ]
+  },
+  "source": "Actual frozen image forward pass; temporary hooks; no gradients"
+}

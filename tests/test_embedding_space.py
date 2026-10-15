@@ -93,6 +93,6 @@ def test_thumbnail_view_keeps_exact_coordinates_and_safe_captions(dimensions,mon
         np.testing.assert_array_equal([row[k] for k in ['X','Y','Z'][:dimensions]],expected)
         assert ('Z' in row)==(dimensions==3)
     assert set(payload['photos'])=={'cat','car'}
-    assert all(src.startswith('data:image/png;base64,') for src in payload['photos'].values())
+    assert all(src.startswith('data:image/jpeg;base64,') for src in payload['photos'].values())
     assert '<script src=' not in html  # No runtime CDN dependency.
     assert payload['credits'][0]['id']=='cat'

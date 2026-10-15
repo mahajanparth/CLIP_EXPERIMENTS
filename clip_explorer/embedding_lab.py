@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 from .thumbnail_space import thumbnail_document
+from .collections import collection_names,collection_photos
 import torch
 from .data import manifest, asset_embeddings, open_asset, photographic_gallery, balanced_photos
 from .model import encode_text
@@ -21,13 +22,26 @@ def _project(vectors: np.ndarray, method: str, perplexity: float, dimensions: in
 def render() -> None:
     intro('06','Explore the embedding space','Where do images and their descriptions sit in the same representation?',
           'CLIP produces 512-dimensional unit vectors for images and text. Fit one shared projection to both modalities and explore a 2D or 3D view. Circles represent images; diamonds represent descriptions; colors identify gallery categories.')
-    gallery = photographic_gallery()
+    collections=collection_names()
+    collection=st.segmented_control('Image collection',collections,default=collections[-1])
+    gallery=collection_photos(collection or collections[-1])
     controls = st.columns([2,1,1,1])
-    categories = controls[0].multiselect('Gallery categories',list(dict.fromkeys(r['category'] for r in gallery)),default=['Animals','Vehicles','Food'])
-    per_category = controls[1].slider('Images per category',1,10,4)
+    categories = controls[0].multiselect('Gallery categories',list(dict.fromkeys(r['category'] for r in gallery)),default=list(dict.fromkeys(r['category'] for r in gallery)))
+    per_category = controls[1].slider('Images per category',1,50,50)
     method = controls[2].selectbox('Projection',['PCA','t-SNE'])
     dimensions=controls[3].select_slider('Plot dimensions',options=[2,3],value=3,format_func=lambda n:f'{n}D')
     records = balanced_photos(gallery,categories,per_category)
+    availability = pd.DataFrame([
+        {'Category':category,
+         'Available photographs':sum(r['category']==category for r in gallery),
+         'Shown':sum(r['category']==category for r in records)}
+        for category in categories
+    ])
+    st.caption(f'{len(categories)} categories selected · {len(records)} real photographs shown · up to {per_category} per category.')
+    if any(row['Available photographs']<per_category for row in availability.to_dict('records')):
+        st.info('Some categories contain fewer photographs than the requested limit. All available photographs are shown once; additional images must be added to reach the limit.')
+    with st.expander('Photographs available per category'):
+        st.dataframe(availability,hide_index=True,width='stretch')
     if len(records)<2:
         st.info('Select at least two images in total to compare image and text points.')
         return
@@ -46,7 +60,7 @@ def render() -> None:
     else:
         perplexity = 8.0
     options = st.columns(2)
-    connect = options[0].checkbox('Connect prepared image–caption pairs',True)
+    connect = options[0].checkbox('Connect prepared image–caption pairs',len(records)<=60)
     show_labels = options[1].checkbox('Show point labels',False)
     selected = st.selectbox('Inspect an image and its caption',range(len(records)),format_func=lambda i:f'{records[i]["label"].title()} · {records[i]["id"]}')
     with st.spinner('Projecting the measured image and text embeddings together…'):
@@ -57,7 +71,9 @@ def render() -> None:
     frame = point_table(records,descriptions,coordinates,query)
     figure = embedding_figure(frame,method,len(records),connect,show_labels,selected)
     st.subheader('The photographs represented in this view')
-    photo_gallery(records,columns=6)
+    preview_count=min(60,len(records))
+    if len(records)>preview_count:st.caption(f'Contact sheet shows the first {preview_count} of {len(records)} photographs. Every selected photo appears in the embedding plots below.')
+    photo_gallery(records[:preview_count],columns=6)
     st.plotly_chart(figure,width='stretch',config={'scrollZoom':True})
     st.caption(('Drag to rotate' if dimensions==3 else 'Drag to pan')+' · scroll to zoom · hover to inspect · click legend entries to toggle groups. Larger markers identify the selected image–caption pair. Connecting lines indicate known pairings, not a claim that every pair is the nearest match.')
     st.subheader('Photographs at their embedding coordinates')
@@ -92,7 +108,7 @@ def render() -> None:
     exports = st.columns(2)
     with exports[0]: downloadable(frame,f'embedding_coordinates_{dimensions}d.csv')
     with exports[1]:
-        st.download_button(f'Download interactive {dimensions}D view · HTML',embedding_document(figure,records,frame,method,connect).encode(),file_name=f'embedding_space_{dimensions}d.html',mime='text/html')
+        st.download_button(f'Download interactive {dimensions}D view · HTML',lambda: embedding_document(figure,records,frame,method,connect).encode(),file_name=f'embedding_space_{dimensions}d.html',mime='text/html')
     with st.expander('What exactly gets projected?'):
         st.latex(rf'X=[\hat V;\hat T]\in\mathbb{{R}}^{{{len(vectors)}\times512}},\quad Z\in\mathbb{{R}}^{{{len(vectors)}\times{dimensions}}}')
         if method=='PCA':

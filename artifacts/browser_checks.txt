@@ -7,3 +7,6 @@ Verified real activation stage selection, prompt comparison, complete tensor dow
 
 Thumbnail embedding views: real photo loading, unchanged projection coordinates, camera drag/reset, resizing, text visibility, click inspection, and embedded offline view passed for 3D PCA, 2D PCA and 2D t-SNE.
 Live embedding lab switched 3D PCA → 2D PCA → 2D t-SNE with thumbnail views and source credits; no browser errors.
+
+Image activation inspector: offline dropdown changes patch projection (49 rows), Vision block 12 (50 rows), and normalized pooled output (1 row); pooled spatial map is empty. Live crop/grid, spatial maps, prompt updates and normalized stage pass without browser errors. Captured output matches normal CLIP image encoding.
+Caltech collection: exactly 50 categories × 50 distinct image hashes, 2,500 cached image embeddings; all 3D PCA, 2D PCA and 2D t-SNE thumbnails load. Category filtering preserves coordinates. Live default has 50 categories/2,500 photographs; deferred full HTML download completed (54 MiB). Pair links start hidden in large views.

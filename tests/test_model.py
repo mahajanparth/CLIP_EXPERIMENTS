@@ -114,3 +114,29 @@ def test_real_text_activation_trace_and_inspector():
     assert not app.exception
     app.checkbox[0].check().run(timeout=60)
     assert not app.exception
+
+
+def test_real_image_activation_trace_and_inspector():
+    import numpy as np
+    from clip_explorer.data import photo_for_label,open_asset
+    from clip_explorer.image_activations import inspect_image_payload
+    from clip_explorer.model import image_bytes,encode_image
+    image=open_asset(photo_for_label('cat'))
+    trace=inspect_image_payload(image_bytes(image))
+    np.testing.assert_allclose(trace['stages']['Normalized CLIP vector'],encode_image(image).numpy(),atol=1e-6)
+    assert trace['stages']['Vision block 12'].shape==(50,768)
+    assert trace['stages']['Patch projection'].shape==(49,768)
+    from streamlit.testing.v1 import AppTest
+    def render_inspector():
+        from clip_explorer.image_activation_lab import render
+        render()
+    app=AppTest.from_function(render_inspector).run(timeout=90)
+    assert not app.exception
+    stage=next(e for e in app.selectbox if e.label=='Image activation stage')
+    stage.set_value('Vision block 12').run(timeout=60)
+    assert not app.exception
+    stage=next(e for e in app.selectbox if e.label=='Image activation stage')
+    stage.set_value('Normalized CLIP vector').run(timeout=60)
+    assert not app.exception
+    app.text_input[0].set_value('a photo of a dog').run(timeout=60)
+    assert not app.exception

@@ -2,7 +2,7 @@
 import streamlit as st
 from clip_explorer.config import CHECKPOINT
 from clip_explorer.model import ModelUnavailable
-from clip_explorer import labs, embedding_lab, process_lab, activation_lab
+from clip_explorer import labs, embedding_lab, process_lab, activation_lab, image_activation_lab
 
 st.set_page_config(page_title='CLIP Explorer',page_icon='↔',layout='wide',initial_sidebar_state='expanded')
 with st.sidebar:
@@ -31,6 +31,7 @@ pages = [
     st.Page(labs.retrieval,title='Image Retrieval',icon=':material/search:'),
     st.Page(labs.failures,title='Failure Laboratory',icon=':material/science:'),
     st.Page(activation_lab.render,title='Text Activation Inspector',url_path='text_activations',icon=':material/neurology:'),
+    st.Page(image_activation_lab.render,title='Image Activation Inspector',url_path='image_activations',icon=':material/image_search:'),
     st.Page(embedding_lab.render,title='Embedding Space · 2D / 3D',url_path='embedding_space',icon=':material/view_in_ar:'),
 ]
 try:

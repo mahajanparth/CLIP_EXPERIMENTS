@@ -11,6 +11,14 @@ COLORS = {'Animals':'#137C75','Vehicles':'#5279C1','Landscapes':'#649447',
           'Food':'#D08036','Robotics':'#9666B5','Household':'#BB617D','People':'#617888'}
 
 
+def category_color(category: str) -> str:
+    if category in COLORS:return COLORS[category]
+    import colorsys
+    import hashlib
+    hue=int(hashlib.sha256(category.encode()).hexdigest()[:8],16)/0xffffffff
+    return '#'+''.join(f'{round(c*255):02x}' for c in colorsys.hsv_to_rgb(hue,.65,.72))
+
+
 def project_joint_embeddings(embeddings: np.ndarray, method: str = 'PCA', perplexity: float = 8.0, dimensions: int = 3) -> tuple[np.ndarray, np.ndarray | None]:
     """Fit one projection to all modalities together; preserve input row order.
 
@@ -25,14 +33,19 @@ def project_joint_embeddings(embeddings: np.ndarray, method: str = 'PCA', perple
         raise ValueError(f'A {dimensions}D projection requires at least {dimensions} finite vectors and features.')
     if method=='PCA':
         projection = PCA(n_components=dimensions,svd_solver='full')
-        coordinates = projection.fit_transform(vectors)
+        from threadpoolctl import threadpool_limits
+        with threadpool_limits(limits=8):
+            coordinates = projection.fit_transform(vectors)
         return coordinates, projection.explained_variance_ratio_
     if method=='t-SNE':
         if not 0<perplexity<len(vectors):
             raise ValueError('t-SNE perplexity must be positive and smaller than the point count.')
-        coordinates = TSNE(n_components=dimensions,perplexity=perplexity,random_state=SEED,
-                           init='pca',learning_rate='auto',max_iter=1000,method='exact',
-                           metric='euclidean',n_jobs=1).fit_transform(vectors)
+        from threadpoolctl import threadpool_limits
+        estimator = TSNE(n_components=dimensions,perplexity=perplexity,random_state=SEED,
+                           init='pca',learning_rate='auto',max_iter=1000,method='barnes_hut' if len(vectors)>500 else 'exact',
+                           metric='euclidean',n_jobs=1)
+        with threadpool_limits(limits=8):
+            coordinates=estimator.fit_transform(vectors)
         return coordinates, None
     raise ValueError('Select PCA or t-SNE.')
 
@@ -58,7 +71,7 @@ def embedding_figure(points: pd.DataFrame, method: str, pair_count: int,
         sizes = [selected_size if selected_pair is not None and i in [selected_pair,pair_count+selected_pair] else (normal_size+3 if query else normal_size) for i in rows.index]
         figure.add_trace(trace_class(x=rows.X,y=rows.Y,**({'z':rows.Z} if dimensions==3 else {}),
             mode='markers+text' if show_labels else 'markers',
-            marker=dict(size=sizes,color='#172B42' if query else COLORS.get(category,'#617888'),
+            marker=dict(size=sizes,color='#172B42' if query else category_color(category),
                         symbol='diamond' if modality!='Image' else 'circle',opacity=.9,
                         line=dict(color='#FFFFFF',width=1)),
             text=rows.Label,textposition='top center',
@@ -69,6 +82,8 @@ def embedding_figure(points: pd.DataFrame, method: str, pair_count: int,
     figure.update_layout(title=f'Joint image + text embeddings · {dimensions}D {method}',height=720,
         legend=dict(orientation='h',y=-.08),margin=dict(l=25,r=25,t=55,b=80),
         paper_bgcolor='rgba(0,0,0,0)',font=dict(size=14))
+    if points.Category.nunique()>10:
+        figure.update_layout(legend=dict(orientation='v',x=1.02,y=1),margin=dict(r=190))
     if dimensions==3:
         figure.update_layout(scene=dict(xaxis_title=axes[0],yaxis_title=axes[1],zaxis_title=axes[2],aspectmode='data'))
     else:
@@ -107,11 +122,12 @@ def embedding_document(figure: go.Figure, records: list[dict], points: pd.DataFr
     """Offline plot with actual photographic thumbnails and hover-linked preview."""
     from html import escape
     from .data import open_asset
-    from .process_visuals import image_uri
+    from .thumbnail_space import photo_uri as image_uri
     cards=[]
-    for record in records:
+    for idx,record in enumerate(records):
         image=open_asset(record);image.thumbnail((300,220))
-        cards.append(f'<article><img id="photo-{escape(record["id"],quote=True)}" src="{image_uri(image)}" alt="{escape(record["label"],quote=True)}" data-caption="{escape(record["caption"],quote=True)}"><strong>{escape(record["label"].title())}</strong><small>{escape(record["id"])}</small><small>{escape(record.get("author",""))} · <a href="{escape(record["source"],quote=True)}">{escape(record["license"])}</a></small></article>')
+        cards.append(f'<article {"hidden" if idx>=60 else ""}><img id="photo-{escape(record["id"],quote=True)}" src="{image_uri(image)}" alt="{escape(record["label"],quote=True)}" data-caption="{escape(record["caption"],quote=True)}"><strong>{escape(record["label"].title())}</strong><small>{escape(record["id"])}</small><small>{escape(record.get("author",""))} · <a href="{escape(record["source"],quote=True)}">{escape(record["license"])}</a></small></article>')
+    if len(records)>60:cards.insert(0,f'<p>Contact sheet previews 60 of {len(records)} images; all photographs are embedded and represented in the plots. Hover any point to inspect its photograph.</p>')
     plot=figure.to_html(full_html=False,include_plotlyjs=True)
     document = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CLIP · Real images and text in 3D</title><style>body{background:#f5f7fa;color:#172b42;font:16px/1.5 Arial,sans-serif;margin:0}main{max-width:1300px;margin:auto;padding:32px}h1{letter-spacing:-1px}.photos{display:grid;grid-template-columns:repeat(6,1fr);gap:15px}article{padding:10px;background:white;border-radius:12px}article img{width:100%;height:130px;object-fit:contain}strong,small{display:block}small{color:#617888;font-size:11px;overflow-wrap:anywhere}a{color:#137c75}.preview{display:flex;gap:20px;align-items:center;background:white;border-radius:12px;padding:16px;margin:20px 0}.preview img{width:220px;height:160px;object-fit:contain}.note{background:#e6f1ef;border-left:4px solid #137c75;padding:16px}@media(max-width:800px){.photos{grid-template-columns:repeat(3,1fr)}}</style></head><body><main><h1>Real photographs + text in the CLIP space</h1><p>Circles are image vectors; diamonds are text vectors. Rotate, zoom, hover, and toggle the legend. Hover an image or paired caption to display the corresponding photograph below.</p><div class="photos">'''+''.join(cards)+'''</div>'''+plot+'''<div class="preview"><img id="hover-photo" alt="Hovered photograph" hidden><div><strong id="hover-caption">Hover a point to inspect its photograph.</strong><small>Matching image/text points reference the same gallery asset.</small></div></div><p class="note">One shared projection is fitted to measured normalized CLIP vectors. 3D positions are a lossy view of the original 512D space; plotted distances should not be used as cosine scores. This view contains real local photographs, with source credits beside each thumbnail. No external script or image download is needed.</p></main><script>const plot=document.querySelector('.js-plotly-plot');plot.on('plotly_hover',event=>{const data=event.points[0].customdata;if(!data)return;const image=document.getElementById('photo-'+data[0]);if(!image)return;const preview=document.getElementById('hover-photo');preview.src=image.src;preview.hidden=false;document.getElementById('hover-caption').textContent=image.dataset.caption;});</script></body></html>'''
 

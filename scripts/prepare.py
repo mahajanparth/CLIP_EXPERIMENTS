@@ -36,7 +36,9 @@ def main() -> None:
     from clip_explorer.model import encode_images, encode_text, load_clip_model, compute_logits
     from clip_explorer.data import open_asset
     from clip_explorer.math_ops import cosine_similarity, ensemble_embeddings
-    records = data['gallery'] + data['probes']
+    from clip_explorer.collections import collection_names,collection_photos
+    additional=collection_photos('Caltech · 50 × 50') if len(collection_names())>1 else []
+    records = data['gallery'] + data['probes'] + additional
     vectors = []
     for start in range(0,len(records),16):
         chunk = records[start:start+16]
@@ -50,7 +52,7 @@ def main() -> None:
     np.savez_compressed(artifacts/'image_embeddings.npz', **{r['id']:v for r,v in zip(records,vectors)})
     (artifacts/'embedding_metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
     offset = len(data['gallery'])
-    probe_vectors = torch.tensor(np.stack(vectors[offset:]))
+    probe_vectors = torch.tensor(np.stack(vectors[offset:offset+len(data["probes"])]))
     probes = data['probes']
     correct_text = encode_text([r['correct'] for r in probes])
     wrong_text = encode_text([r['incorrect'] for r in probes])

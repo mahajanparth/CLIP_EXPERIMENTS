@@ -34,7 +34,7 @@ All strategies use the same real photographs labeled dog, cat, car, and bicycle 
 - `failure_margins.html`, `prompt_comparison.html`: interactive standalone Plotly figures; no CDN needed.
 - `gallery_contact_sheet.jpg`: real photographic gallery preview; credits are in assets/PHOTO_CREDITS.md.
 - `embedding_space_2d_pca.html`, `embedding_space_2d_tsne.html`: interactive 2D projections of the same measured image/text vectors, with real photo thumbnails. Matching PNG/SVG plots, coordinate CSVs, and embedding_projection_metadata.json are included. t-SNE is fitted independently in 2D, not sliced from the 3D layout.
-- `embedding_space_3d.html`, `embedding_coordinates_3d.csv`: shared PCA projection of 12 measured image vectors and their 12 caption vectors. The three axes retain 65.8% of joint variance. Projection distances are lossy; cosine rankings use the original 512D space.
+- `embedding_space_3d.html`, `embedding_coordinates_3d.csv`: shared PCA projection of 2500 measured image vectors and their 2500 caption vectors. The three axes retain 44.1% of joint variance. Projection distances are lossy; cosine rankings use the original 512D space.
 
 Regenerate with `python scripts/prepare.py` then `python scripts/export_artifacts.py`. No network is used when the checkpoint is already present.
 

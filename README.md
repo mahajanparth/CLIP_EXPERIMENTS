@@ -51,9 +51,10 @@ Photographs are preserved when regenerating the artwork. The four original sciki
 | Contrastive Learning | Raw cosines, row/column softmax, adjustable temperature, symmetric loss, rotated captions | Four/six matched photographs; clearly labeled synthetic unit-vector example |
 | Zero-Shot Classification | Uploaded/local image, editable candidates/template, cosines vs learned-scale softmax | Broad classes, dog-breed preset, local gallery |
 | Prompt Engineering | Phrase sensitivity; raw/contextual/normalized ensemble strategies | Same 17 labeled photographs and four labels |
+| Image Activation Inspector | Actual model crop, patch features, 12 vision blocks, spatial maps, class readout, and image–prompt cosine | Frozen image forward pass; curated/50 × 50 collections and uploads |
 | Text Activation Inspector | BPE tokens, lookup/position features, 12 contextual layers, EOS readout, feature trajectories and prompt comparison | Real frozen text forward pass; no image input required |
 | Image Retrieval | Text-to-image and image-to-image ranking, adjustable K | 38 real photographs with recorded sources and licenses |
-| Embedding Space · 2D / 3D | Joint 2D/3D PCA/t-SNE views of image/text vectors; matched-pair links, editable prompts, extra query point | 12 paired photographs/captions from the local gallery |
+| Embedding Space · 2D / 3D | Joint 2D/3D PCA/t-SNE views of image/text vectors; matched-pair links, editable prompts, extra query point | All available categories, up to 50 real photographs/captions per category |
 | Failure Laboratory | Counting, spatial relationships, attribute binding; paired margins and accuracy | 30 controlled labeled examples per experiment |
 
 Every page includes a research question, an explanation, an interactive experiment, visualized results, mathematical notes, and a takeaway. Each page offers measured CSV downloads where applicable. The synthetic contrastive lab works without weights; inference pages give setup instructions if weights are missing and never substitute fake model predictions.
@@ -178,3 +179,24 @@ The seed is 2021. Artwork and tie-breaking are deterministic. Small numeric diff
 ## Research sources
 
 [Paper](https://arxiv.org/abs/2103.00020), especially Figure 3 and §3.1.4; [official OpenAI CLIP implementation](https://github.com/openai/CLIP). The pretrained ViT-B/32 demonstration should not be conflated with every reported paper result or its larger best-performing model. No original CLIP training data is redistributed here. Original drawing assets are dedicated under CC0-1.0; photographic permissions are recorded separately.
+
+The embedding lab defaults to the **Caltech · 50 × 50** collection: exactly 2,500 distinct real images across 50 categories, with 50 in every category. The separate curated gallery retains 38 photographs across 7 broad categories. Select a collection, filter categories, and choose 1–50 photographs each. Large t-SNE views use Barnes–Hut approximation; smaller views use exact t-SNE. Offline exports use the larger collection when prepared. The thumbnail category filter hides groups without refitting or changing coordinates.
+
+
+## Inspect image features and activations
+
+Open **Image Activation Inspector**. Choose a collection, category, and photograph, or upload an image. Inspect the actual CLIP center crop with its 7 × 7 grid, patch projection (49 × 768), class-plus-patch residual states (50 × 768), all 12 vision blocks, final class layer normalization, and projected/normalized image vector (1 × 512). Heatmaps show selected features, spatial maps show patch RMS or one feature, and trajectories follow a class or patch token across depth.
+
+Enter a text prompt to see the image–text cosine and each normalized coordinate's contribution to that sum. The prompt does not alter the image activations: the two encoders run independently. These maps display real feature values, not attention or saliency. Download full activation tensors, metadata, or a self-contained HTML snapshot. Default artifacts: `artifacts/image_activations.html`, `image_activations.npz`, and `image_activations_metadata.json`.
+
+```bash
+python scripts/export_image_activations.py
+```
+
+The larger dataset is a reproducible subset of [Caltech-101](https://data.caltech.edu/records/mzrjq-6wc02), credited to its dataset creators under the repository's CC BY 4.0 record. Original JPEG bytes, archive-member paths, and SHA-256 hashes are retained. Selection excludes categories with fewer than 50 files and listed nonphotographic/redundant groups, then takes the first 50 eligible categories and first 50 filenames each. See `assets/CALTECH50_CREDITS.md` and `assets/caltech50_manifest.json`; this is an educational subset, not a benchmark split.
+
+```bash
+python scripts/prepare_caltech50.py  # Official archive download, cached locally
+python scripts/cache_collection.py  # Extend measured embeddings using local weights
+python scripts/export_artifacts.py
+```
