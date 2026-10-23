@@ -1,5 +1,0 @@
-Class,Prompt,Cosine similarity,Scaled logit,Probability
-dog,a photo of a dog,0.22943458,22.94346,0.0048157414
-cat,a photo of a cat,0.2827426,28.274261,0.9949485
-car,a photo of a car,0.18925464,18.925467,8.663045e-05
-bicycle,a photo of a bicycle,0.19468993,19.468994,0.00014918378

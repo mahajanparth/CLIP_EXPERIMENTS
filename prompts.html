@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Words Change the Experiment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: part 1 (one image, many descriptions) → part 2 (three classifier strategies: controls, formulas, scoreboard, per-class dot plot, flipped images, one image up close). Same dark 3Blue1Brown palette and tester styling as the Blind Spots page. */
+:root{
+  --bg:#0e1116; --surface:#161b24; --ink:#ece6da; --muted:#8d95a2; --line:#283142;
+  --blue:#58c4dd; --gold:#d99a4e; --yellow:#f4e07a; --green:#83c167; --red:#fc6255;
+  --serif:"STIX Two Text","STIX Two","Cambria Math",Georgia,serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--bg);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.55}
+img{max-width:100%}
+[hidden]{display:none!important}
+a{color:var(--blue)}
+:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:28px 72px;display:grid;gap:44px}
+nav{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:13px}
+nav a{color:var(--muted);text-decoration:none}
+nav a:hover{color:var(--blue)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:16px 0 0}
+h1{font-size:clamp(2rem,4.6vw,3rem);font-weight:400;line-height:1.1;margin:.2em 0 .25em;text-wrap:balance}
+h1 em{color:var(--red)}
+h2{font-size:1.6rem;font-weight:400;margin:0 0 6px;text-wrap:balance}
+h2 .k{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px}
+.lede{color:var(--muted);max-width:68ch;margin:0}
+.intro{max-width:70ch;margin:0 0 18px;color:var(--muted)}
+section{min-width:0}
+/* scoreboard */
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{border:1px solid var(--line);border-radius:8px;padding:18px;background:var(--surface);display:grid;gap:10px;align-content:start}
+.card h3{margin:0;font-size:1.15rem;font-weight:400}
+.card .ex{font-style:italic;color:var(--muted);font-size:.95rem;margin:0}
+.big{font-family:var(--mono);font-size:2.2rem;line-height:1;font-variant-numeric:tabular-nums}
+.big small{font-size:.9rem;color:var(--muted);margin-left:6px}
+.strip{display:flex;flex-wrap:wrap;gap:3px}
+.strip i{width:12px;height:12px;border-radius:2px;display:block}
+.strip i.ok{background:var(--green)} .strip i.no{background:var(--red)}
+.strip .pr{display:flex;gap:1px;margin-right:4px}
+.card .foot{font-size:.92rem;color:var(--ink);margin:0}
+.card .foot b{font-family:var(--mono);font-weight:500}
+.verdict{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.verdict.bad{color:var(--red)} .verdict.meh{color:var(--yellow)}
+/* tabs */
+.tabs{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:max-content;max-width:100%;flex-wrap:wrap;margin-bottom:16px}
+.tabs button{font-family:var(--mono);font-size:13px;padding:8px 14px;border:0;border-right:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
+.tabs button:last-child{border-right:0}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:inset 0 -2px 0 var(--blue)}
+.pairs{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.pair{border:1px solid var(--line);border-radius:8px;padding:12px;display:grid;gap:10px;background:var(--bg)}
+.caps{display:grid;gap:2px;font-size:.88rem;line-height:1.35}
+.caps span b{font-family:var(--mono);font-weight:500;color:var(--blue);margin-right:6px}
+.caps span:nth-child(2) b{color:var(--gold)}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.shot{display:grid;gap:6px;min-width:0}
+.thumb{width:100%;aspect-ratio:1;border-radius:4px;background-repeat:no-repeat;border:1px solid var(--line);cursor:pointer;padding:0}
+.thumb:hover{border-color:var(--blue)}
+.mbar{display:grid;grid-template-columns:14px minmax(0,1fr) 46px;gap:5px;align-items:center;font-family:var(--mono);font-size:11px;font-variant-numeric:tabular-nums}
+.mbar .t{height:7px;background:var(--line);border-radius:2px;overflow:hidden}
+.mbar .t b{display:block;height:100%}
+.mbar.A .t b{background:var(--blue)} .mbar.B .t b{background:var(--gold)}
+.mbar .l{color:var(--muted)}
+.mbar .v{text-align:right}
+.mbar.right .v{color:var(--green)}
+.tag{font-family:var(--mono);font-size:11px}
+.tag.ok{color:var(--green)} .tag.no{color:var(--red)}
+.count-wrap{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:760px){.count-wrap{grid-template-columns:minmax(0,1fr)}}
+.conf{border-collapse:collapse;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+.conf th{font-weight:400;color:var(--muted);padding:6px 8px;font-size:12px}
+.conf td{width:44px;height:40px;text-align:center;border:1px solid var(--bg)}
+.conf td.diag{outline:2px solid var(--green);outline-offset:-2px}
+.conf caption{caption-side:bottom;text-align:left;color:var(--muted);font-size:12px;padding-top:8px;font-family:var(--serif)}
+.apples{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+.apples .shot .tag{text-align:center}
+/* why */
+.why{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:28px;align-items:start}
+@media (max-width:860px){.why{grid-template-columns:minmax(0,1fr)}}
+.chart{overflow-x:auto}
+.chart svg{display:block;width:100%;height:auto;min-width:460px}
+.why p{margin:0 0 10px;max-width:62ch}
+.why p.m{color:var(--muted);font-size:.95rem}
+/* tester */
+.tester{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:860px){.tester{grid-template-columns:minmax(0,1fr)}}
+.panel{border:1px solid var(--line);border-radius:8px;padding:16px;background:var(--surface);display:grid;gap:12px;min-width:0}
+.lab{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.drop{position:relative;border:1.5px dashed var(--line);border-radius:8px;aspect-ratio:1;display:grid;place-items:center;overflow:hidden;background:var(--bg)}
+.drop.over{border-color:var(--blue)}
+.drop img,.drop .bg{width:100%;height:100%;object-fit:cover;background-repeat:no-repeat}
+.drop .empty{color:var(--muted);text-align:center;padding:20px;font-size:.95rem}
+.drop .src{position:absolute;left:8px;bottom:8px;right:8px;font-family:var(--mono);font-size:11px;color:var(--ink);background:rgba(14,17,22,.78);padding:4px 7px;border-radius:4px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button.plain,label.plain{font-family:var(--mono);font-size:13px;padding:8px 13px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+button.plain:hover,label.plain:hover{border-color:var(--blue)}
+label.plain input{position:absolute;width:1px;height:1px;opacity:0}
+label.plain:focus-within{outline:2px solid var(--yellow);outline-offset:2px}
+button.go{font-family:var(--mono);font-size:14px;font-weight:500;padding:10px 18px;border-radius:999px;border:0;background:var(--blue);color:var(--bg);cursor:pointer}
+button.go:disabled{opacity:.5;cursor:progress}
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+.presets button{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
+.presets button:hover{color:var(--ink);border-color:var(--gold)}
+textarea{width:100%;min-height:150px;resize:vertical;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:var(--serif);font-size:1rem;line-height:1.5}
+textarea:focus{border-color:var(--blue);outline:none}
+.small{font-size:.88rem;color:var(--muted);margin:0}
+.models{display:grid;gap:8px}
+.model{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;font-family:var(--mono);font-size:12px}
+.model .name{color:var(--ink)}
+.model .st{color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.model .st.ok{color:var(--green)}
+.prog{grid-column:1/-1;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.prog b{display:block;height:100%;width:0;background:var(--blue);transition:width .2s}
+.results{display:grid;gap:10px}
+.res{display:grid;grid-template-columns:minmax(0,1fr) 150px 70px;gap:4px 14px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.res.win{border-color:var(--green)}
+.res .cap{font-size:1rem;line-height:1.35;min-width:0;overflow-wrap:anywhere}
+.res .toks{grid-column:1/-1;font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.res .bar{height:8px;background:var(--line);border-radius:2px;overflow:hidden}
+.res .bar b{display:block;height:100%;background:var(--gold)}
+.res.win .bar b{background:var(--green)}
+.res .num{font-family:var(--mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums;line-height:1.3}
+.res .num small{display:block;color:var(--muted);font-size:11px}
+@media (max-width:520px){.res{grid-template-columns:minmax(0,1fr) 70px}.res .bar{grid-column:1/-1;grid-row:3}}
+.note{font-size:.92rem;color:var(--muted);margin:0;max-width:70ch}
+.note b{color:var(--ink);font-family:var(--mono);font-weight:500}
+.err{color:var(--red);font-family:var(--mono);font-size:12px;margin:0}
+.refs{color:var(--muted);font-size:.9rem;border-top:1px solid var(--line);padding-top:16px;display:grid;gap:6px}
+.refs p{margin:0}
+
+.split{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:860px){.split{grid-template-columns:minmax(0,1fr)}}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px}
+.ctl .panel textarea{min-height:120px}
+input[type=text]{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-family:var(--serif);font-size:1rem}
+input[type=text]:focus{border-color:var(--blue);outline:none}
+.segs{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-wrap:wrap;width:max-content;max-width:100%}
+.segs label{position:relative;cursor:pointer}
+.segs input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.segs span{display:block;padding:8px 14px;font-family:var(--mono);font-size:13px;color:var(--muted);background:var(--bg);border-right:1px solid var(--line)}
+.segs label:last-child span{border-right:0}
+.segs input:checked+span{background:var(--surface);color:var(--ink);box-shadow:inset 0 -2px 0 var(--blue)}
+.segs input:focus-visible+span{outline:2px solid var(--yellow);outline-offset:-2px}
+.formulas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.formula{background:var(--bg);padding:14px 16px;display:grid;gap:8px;align-content:start}
+.formula h3{margin:0;font-size:1.05rem;font-weight:400;display:flex;align-items:center;gap:8px}
+.formula h3 i{width:11px;height:11px;border-radius:50%;display:inline-block}
+.formula .f{overflow-x:auto}
+.formula p{margin:0;font-size:.9rem;color:var(--muted)}
+math{font-family:"STIX Two Math","Latin Modern Math","Cambria Math",math;font-size:1.1em;color:var(--ink)}
+math[display="block"]{margin:0;text-align:left;justify-content:flex-start}
+.sw-raw{background:var(--muted)} .sw-single{background:var(--gold)} .sw-ens{background:var(--blue)}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:14px}
+.metric{border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:var(--surface);display:grid;gap:4px}
+.metric .h{display:flex;align-items:center;gap:8px;font-size:1rem}
+.metric .h i{width:11px;height:11px;border-radius:50%;display:inline-block}
+.metric .n{font-family:var(--mono);font-size:2rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.metric .d{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.metric .d b{font-weight:500}
+.up{color:var(--green)} .down{color:var(--red)}
+.chart{overflow-x:auto}
+.chart svg{display:block;width:100%;height:auto;min-width:520px}
+.flips{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}
+.flip{all:unset;box-sizing:border-box;display:grid;gap:5px;cursor:pointer;padding:6px;border-radius:6px;border:1px solid transparent;min-width:0}
+.flip:hover,.flip[aria-pressed="true"]{border-color:var(--blue);background:var(--surface)}
+.flip:focus-visible{outline:2px solid var(--yellow)}
+.flip .im{width:100%;aspect-ratio:1;border-radius:4px;background-repeat:no-repeat}
+.flip .lb{font-size:13px;line-height:1.2}
+.flip .pr{font-family:var(--mono);font-size:10.5px;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+.flip .pr .ok{color:var(--green)} .flip .pr .no{color:var(--red)}
+.closeup{display:grid;grid-template-columns:minmax(0,160px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:620px){.closeup{grid-template-columns:minmax(0,1fr)}}
+.closeup .im{width:100%;max-width:160px;aspect-ratio:1;border-radius:6px;background-repeat:no-repeat;border:1px solid var(--line)}
+.gbars{display:grid;gap:10px}
+.gb{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr);gap:4px 12px;align-items:center}
+.gb .c{font-size:.95rem;overflow-wrap:anywhere}
+.gb .c.true{color:var(--green)}
+.gb .bs{display:grid;gap:3px}
+.gb .bs div{display:grid;grid-template-columns:minmax(0,1fr) 52px;gap:8px;align-items:center;font-family:var(--mono);font-size:11px;font-variant-numeric:tabular-nums}
+.gb .bs span.t{height:7px;background:var(--line);border-radius:2px;overflow:hidden}
+.gb .bs span.t b{display:block;height:100%}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.sub2{font-size:1.15rem;font-weight:400;margin:0 0 8px}
+.stack{display:grid;gap:22px}
+.progress{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.progress b{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <nav><a href="index.html">← How CLIP Works</a><a href="demo.html">Embedding Explorer</a><a href="failures.html">CLIP’s Blind Spots</a><a href="zeroshot.html">Zero-shot classifier</a></nav>
+    <p class="eyebrow">Prompt engineering · OpenAI CLIP ViT-B/32</p>
+    <h1>Words <em>Change</em> the Experiment</h1>
+    <p class="lede">How much do phrasing and context change the same class? Compare descriptions of one image, then compare three classifier strategies using exactly the same images and labels. Ensembling averages normalized text embeddings before scoring.</p>
+  </header>
+
+  <section aria-labelledby="h-one" class="stack">
+    <div>
+      <h2 id="h-one"><span class="k">Part 1</span>One image, different words</h2>
+      <p class="intro">Every line is encoded separately, so each wording is a different point in CLIP’s space. The image does not change; only the words do.</p>
+    </div>
+    <div class="split">
+      <div class="panel">
+        <div class="lab">Image</div>
+        <div class="drop" id="drop1"></div>
+        <div class="row">
+          <button class="plain" type="button" id="p-prev">◀ Photo</button>
+          <button class="plain" type="button" id="p-next">Photo ▶</button>
+          <label class="plain" for="file1">Upload<input type="file" id="file1" accept="image/*"></label>
+        </div>
+        <p class="small">Uploading or pasting your own image needs CLIP’s image encoder (89 MB, runs on this device).</p>
+      </div>
+      <div class="panel">
+        <div class="lab">Try a set of descriptions</div>
+        <div class="presets" id="d-presets"></div>
+        <label class="lab" for="desc">Descriptions · one per line (up to 10)</label>
+        <textarea id="desc" spellcheck="false"></textarea>
+        <div class="row"><button class="go" id="run1" type="button">Score descriptions</button><span class="small" id="need1"></span></div>
+        <div class="progress" id="prog1" hidden><b></b></div>
+        <p class="err" id="err1" hidden></p>
+        <div class="results" id="res1" aria-live="polite"></div>
+        <p class="note" id="note1"></p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-two" class="stack">
+    <div>
+      <h2 id="h-two"><span class="k">Part 2</span>Three ways to build the same classifier</h2>
+      <p class="intro">Each strategy turns the same class labels into one text vector per class. Every image is assigned to the class with the highest cosine. Images and labels stay fixed; only the words change.</p>
+    </div>
+    <fieldset style="border:0;padding:0;margin:0"><legend class="lab" style="margin-bottom:6px">Evaluate on</legend><div class="segs">
+      <label><input type="radio" name="set" value="caltech50" checked><span>Caltech-101 · 50 classes · 1,000 images</span></label>
+      <label><input type="radio" name="set" value="photos4"><span>17 photos · dog, cat, car, bicycle</span></label>
+    </div></fieldset>
+    <div class="ctl">
+      <div class="panel">
+        <label class="lab" for="classes">Shared class labels · one per line</label>
+        <textarea id="classes" spellcheck="false"></textarea>
+        <p class="small" id="cls-note"></p>
+      </div>
+      <div class="panel">
+        <label class="lab" for="single">Single contextual template</label>
+        <input type="text" id="single" spellcheck="false">
+        <div class="presets" id="s-presets"></div>
+        <label class="lab" for="templates">Ensemble templates · one {} each</label>
+        <textarea id="templates" spellcheck="false"></textarea>
+        <div class="presets" id="t-presets"></div>
+      </div>
+    </div>
+    <div class="row"><button class="go" id="run2" type="button">Compare strategies</button><span class="small" id="need2"></span></div>
+    <div class="progress" id="prog2" hidden><b></b></div>
+    <p class="err" id="err2" hidden></p>
+
+    <div class="formulas" id="formulas"></div>
+    <div class="metrics" id="metrics" aria-live="polite"></div>
+    <p class="note" id="metric-note"></p>
+
+    <div>
+      <h3 class="sub2">Where the wording moved predictions</h3>
+      <div class="legend"><span><i class="sw-raw"></i>raw class names</span><span><i class="sw-single"></i>single template</span><span><i class="sw-ens"></i>template ensemble</span></div>
+      <div class="chart" id="dots"></div>
+    </div>
+    <div>
+      <h3 class="sub2">Images the strategies disagree on</h3>
+      <p class="small" id="flip-note"></p>
+      <div class="flips" id="flips"></div>
+    </div>
+    <div>
+      <h3 class="sub2">One image up close</h3>
+      <div class="closeup" id="closeup"></div>
+    </div>
+  </section>
+
+  <footer class="refs">
+    <p>Radford et al., “Learning Transferable Visual Models From Natural Language Supervision”, ICML 2021, §3.1.4 (prompt engineering and ensembling). The 7 templates are the ones the CLIP authors recommend for ImageNet.</p>
+    <p>Images: Caltech-101 (Fei-Fei Li, Marco Andreeto, Marc’Aurelio Ranzato, Pietro Perona; CC BY 4.0), first 20 images of each of the first 50 eligible classes. Photos from Wikimedia Commons and scikit-image, credited on the <a href="demo.html">Embedding Explorer</a>. Image vectors come from the full-precision model; text vectors from the 8-bit copy that runs in this page.</p>
+  </footer>
+</main>
+
+<script id="engine-src" type="text/plain">
+// Pure-JS CLIP ViT-B/32 inference with int8 per-row weights. No dependencies; runs in a Web Worker or Node.
+function createClipEngine(){
+  const models = {};
+
+  function loadModel(kind, header, buffer){
+    const T = {};
+    for (const [name, t] of Object.entries(header.tensors)){
+      const n = t.shape.reduce((a, b) => a * b, 1);
+      if (t.dtype === 'i8') T[name] = {q:new Int8Array(buffer, t.offset, n), s:new Float32Array(buffer, t.scales, t.shape[0]), shape:t.shape};
+      else T[name] = {f:new Float32Array(buffer, t.offset, n), shape:t.shape};
+    }
+    models[kind] = T;
+  }
+
+  // y[n×out] = x[n×in] · Wᵀ (+ b), W int8 with one scale per output row
+  function linear(T, x, n, name, bias){
+    const W = T[name], out = W.shape[0], inD = W.shape[1], q = W.q, s = W.s, b = bias ? T[bias].f : null;
+    const y = new Float32Array(n * out);
+    for (let o = 0; o < out; o++){
+      const wo = o * inD, so = s[o], bo = b ? b[o] : 0;
+      let t = 0;
+      for (; t + 3 < n; t += 4){
+        const x0 = t * inD, x1 = x0 + inD, x2 = x1 + inD, x3 = x2 + inD;
+        let a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+        for (let k = 0; k < inD; k++){ const w = q[wo + k]; a0 += x[x0 + k] * w; a1 += x[x1 + k] * w; a2 += x[x2 + k] * w; a3 += x[x3 + k] * w; }
+        y[t * out + o] = a0 * so + bo; y[(t + 1) * out + o] = a1 * so + bo; y[(t + 2) * out + o] = a2 * so + bo; y[(t + 3) * out + o] = a3 * so + bo;
+      }
+      for (; t < n; t++){ const xo = t * inD; let a = 0; for (let k = 0; k < inD; k++) a += x[xo + k] * q[wo + k]; y[t * out + o] = a * so + bo; }
+    }
+    return y;
+  }
+
+  function layerNorm(T, x, n, d, name){
+    const g = T[name + '.weight'].f, b = T[name + '.bias'].f, y = new Float32Array(n * d);
+    for (let t = 0; t < n; t++){
+      const o = t * d; let mu = 0; for (let k = 0; k < d; k++) mu += x[o + k]; mu /= d;
+      let v = 0; for (let k = 0; k < d; k++){ const z = x[o + k] - mu; v += z * z; } v /= d;
+      const r = 1 / Math.sqrt(v + 1e-5);
+      for (let k = 0; k < d; k++) y[o + k] = (x[o + k] - mu) * r * g[k] + b[k];
+    }
+    return y;
+  }
+
+  function attention(T, x, n, d, heads, p, causal){
+    const qkv = linear(T, x, n, p + 'in_proj_weight', p + 'in_proj_bias'), hd = d / heads, sc = 1 / Math.sqrt(hd);
+    const out = new Float32Array(n * d), w = new Float32Array(n);
+    for (let h = 0; h < heads; h++){
+      for (let i = 0; i < n; i++){
+        const qi = i * 3 * d + h * hd, lim = causal ? i + 1 : n;
+        let mx = -Infinity;
+        for (let j = 0; j < lim; j++){ const kj = j * 3 * d + d + h * hd; let s = 0; for (let k = 0; k < hd; k++) s += qkv[qi + k] * qkv[kj + k]; s *= sc; w[j] = s; if (s > mx) mx = s; }
+        let sum = 0; for (let j = 0; j < lim; j++){ w[j] = Math.exp(w[j] - mx); sum += w[j]; }
+        const oi = i * d + h * hd;
+        for (let j = 0; j < lim; j++){ const a = w[j] / sum, vj = j * 3 * d + 2 * d + h * hd; for (let k = 0; k < hd; k++) out[oi + k] += a * qkv[vj + k]; }
+      }
+    }
+    return linear(T, out, n, p + 'out_proj.weight', p + 'out_proj.bias');
+  }
+
+  function transformer(T, x, n, d, heads, prefix, layers, causal, progress){
+    for (let l = 0; l < layers; l++){
+      const p = `${prefix}resblocks.${l}.`;
+      const a = attention(T, layerNorm(T, x, n, d, p + 'ln_1'), n, d, heads, p + 'attn.', causal);
+      for (let i = 0; i < x.length; i++) x[i] += a[i];
+      const h = linear(T, layerNorm(T, x, n, d, p + 'ln_2'), n, p + 'mlp.c_fc.weight', p + 'mlp.c_fc.bias');
+      for (let i = 0; i < h.length; i++){ const v = h[i]; h[i] = v / (1 + Math.exp(-1.702 * v)); }   // QuickGELU
+      const m = linear(T, h, n, p + 'mlp.c_proj.weight', p + 'mlp.c_proj.bias');
+      for (let i = 0; i < x.length; i++) x[i] += m[i];
+      if (progress) progress((l + 1) / layers);
+    }
+    return x;
+  }
+
+  function normalize(v){ let s = 0; for (const x of v) s += x * x; s = Math.sqrt(s); return Array.from(v, x => x / s); }
+
+  // pixels: Float32Array 3×224×224 (CHW), already normalized with CLIP's mean/std
+  function encodeImage(pixels, progress){
+    const T = models.vision, d = 768, g = 7, P = 32, n = g * g + 1;
+    const patches = new Float32Array(g * g * 3 * P * P);
+    for (let py = 0; py < g; py++) for (let px = 0; px < g; px++){
+      const o = (py * g + px) * 3 * P * P;
+      for (let c = 0; c < 3; c++) for (let ky = 0; ky < P; ky++) for (let kx = 0; kx < P; kx++)
+        patches[o + c * P * P + ky * P + kx] = pixels[c * 224 * 224 + (py * P + ky) * 224 + px * P + kx];
+    }
+    const emb = linear(T, patches, g * g, 'visual.conv1.weight', null);
+    const x = new Float32Array(n * d), cls = T['visual.class_embedding'].f, pos = T['visual.positional_embedding'].f;
+    for (let k = 0; k < d; k++) x[k] = cls[k] + pos[k];
+    for (let t = 1; t < n; t++) for (let k = 0; k < d; k++) x[t * d + k] = emb[(t - 1) * d + k] + pos[t * d + k];
+    let h = layerNorm(T, x, n, d, 'visual.ln_pre');
+    h = transformer(T, h, n, d, 12, 'visual.transformer.', 12, false, progress);
+    const c = layerNorm(T, h.subarray(0, d), 1, d, 'visual.ln_post');
+    return normalize(linear(T, c, 1, 'visual.proj', null));
+  }
+
+  // ids: [SOT, ..., EOT]; with a causal mask, tokens after EOT cannot change it, so we only run up to EOT
+  function encodeText(ids){
+    const T = models.text, d = 512, n = ids.length, E = T['token_embedding.weight'], pos = T['positional_embedding'].f;
+    const x = new Float32Array(n * d);
+    for (let t = 0; t < n; t++){ const r = ids[t] * d, s = E.s[ids[t]]; for (let k = 0; k < d; k++) x[t * d + k] = E.q[r + k] * s + pos[t * d + k]; }
+    const h = transformer(T, x, n, d, 8, 'transformer.', 12, true, null);
+    const last = layerNorm(T, h.subarray((n - 1) * d, n * d), 1, d, 'ln_final');
+    return normalize(linear(T, last, 1, 'text_projection', null));
+  }
+
+  return {loadModel, encodeImage, encodeText, has:k => !!models[k]};
+}
+
+// CLIP's byte-level BPE tokenizer (port of clip/simple_tokenizer.py, without ftfy)
+function createTokenizer(mergesText){
+  const bs = [];
+  for (let i = 33; i <= 126; i++) bs.push(i); for (let i = 161; i <= 172; i++) bs.push(i); for (let i = 174; i <= 255; i++) bs.push(i);
+  const cs = bs.slice(); let n = 0;
+  for (let b = 0; b < 256; b++) if (!bs.includes(b)){ bs.push(b); cs.push(256 + n); n++; }
+  const byteEnc = {}; bs.forEach((b, i) => byteEnc[b] = String.fromCharCode(cs[i]));
+  const merges = mergesText.split('\n').filter(Boolean).map(l => l.split(' '));
+  const vocab = bs.map(b => byteEnc[b]); const base = vocab.slice();   // insertion order, as in Python's dict
+  for (const v of base) vocab.push(v + '</w>');
+  for (const m of merges) vocab.push(m.join(''));
+  vocab.push('<|startoftext|>', '<|endoftext|>');
+  const enc = new Map(vocab.map((v, i) => [v, i]));
+  const ranks = new Map(merges.map((m, i) => [m[0] + ' ' + m[1], i]));
+  const cache = new Map();
+  const pat = /<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+/giu;
+  const utf8 = new TextEncoder();
+  function bpe(token){
+    if (cache.has(token)) return cache.get(token);
+    let word = Array.from(token); word[word.length - 1] += '</w>';
+    while (word.length > 1){
+      let best = null, br = Infinity;
+      for (let i = 0; i < word.length - 1; i++){ const r = ranks.get(word[i] + ' ' + word[i + 1]); if (r !== undefined && r < br){ br = r; best = i; } }
+      if (best === null) break;
+      const a = word[best], b = word[best + 1], nw = [];
+      for (let i = 0; i < word.length;){
+        if (i < word.length - 1 && word[i] === a && word[i + 1] === b){ nw.push(a + b); i += 2; } else { nw.push(word[i]); i++; }
+      }
+      word = nw;
+    }
+    cache.set(token, word); return word;
+  }
+  function encode(text){
+    const clean = text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim().toLowerCase();
+    const ids = [];
+    for (const m of clean.matchAll(pat)){
+      const tok = Array.from(utf8.encode(m[0]), b => byteEnc[b]).join('');
+      for (const piece of bpe(tok)) ids.push(enc.get(piece));
+    }
+    return [49406, ...ids.slice(0, 75), 49407];
+  }
+  return {encode, decode:ids => ids.map(i => vocab[i]).join('').replace(/<\/w>/g, ' ')};
+}
+
+
+</script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = v => (v < 0 ? '−' : '') + Math.abs(v).toFixed(3);
+const DIM = 512;
+const COL = {raw:'#8d95a2', single:'#d99a4e', ens:'#58c4dd'};
+const NAMES = {raw:'Raw class names', single:'Single template', ens:'Template ensemble'};
+function unpack(b64){ const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return Float32Array.from(new Int16Array(u8.buffer), v => v / 32767); }
+function bg(atlas, n, k){ const rows = Math.ceil(n / atlas.cols); return `background-image:url(${atlas.file});background-size:${atlas.cols * 100}% ${rows * 100}%;background-position:${(k % atlas.cols) / (atlas.cols - 1) * 100}% ${Math.floor(k / atlas.cols) / Math.max(1, rows - 1) * 100}%`; }
+const dot = (a, b) => { let s = 0; for (let k = 0; k < DIM; k++) s += a[k] * b[k]; return s; };
+const normalize = v => { let s = 0; for (const x of v) s += x * x; s = Math.sqrt(s) || 1; return Float32Array.from(v, x => x / s); };
+function showErr(id, m){ const el = $(id); el.textContent = m; el.hidden = !m; }
+
+/* ---------- MathML for the three strategies ---------- */
+const mi = s => `<mi>${s}</mi>`, mn = s => `<mn>${s}</mn>`, mo = s => `<mo>${s}</mo>`, mt = s => `<mtext>${s}</mtext>`;
+const mr = (...a) => `<mrow>${a.join('')}</mrow>`, sb = (a, b) => `<msub>${a}${b}</msub>`, fr = (a, b) => `<mfrac>${a}${b}</mfrac>`, uo = (a, b, c) => `<munderover>${a}${b}${c}</munderover>`;
+const P = (...a) => mr(mo('('), ...a, mo(')')), M = (...a) => `<math display="block">${mr(...a)}</math>`;
+const nz = a => mr(mi('normalize'), P(a)), uc = sb(mi('u'), mi('c')), g = mi('g');
+$('formulas').innerHTML = [
+  ['raw', NAMES.raw, M(uc, mo('='), nz(mr(g, P(mi('c'))))), 'Encode the bare label, e.g. “ketch”.'],
+  ['single', NAMES.single, M(uc, mo('='), nz(mr(g, P(mr(mi('t'), P(mi('c'))))))), 'Fill one template, e.g. “a photo of a ketch”.'],
+  ['ens', NAMES.ens, M(sb(`<mover accent="true"><mi>u</mi><mo>¯</mo></mover>`, mi('c')), mo('='), nz(mr(fr(mn(1), mi('M')), uo(mo('∑'), mr(mi('m'), mo('='), mn(1)), mi('M')), nz(mr(g, P(mr(sb(mi('t'), mi('m')), P(mi('c'))))))))), 'Normalize every prompt vector, average per class, normalize the mean. Probabilities are never averaged.'],
+].map(([k, h, f, p]) => `<div class="formula"><h3><i class="sw-${k}"></i>${h}</h3><div class="f">${f}</div><p>${p}</p></div>`).join('')
+  + `<div class="formula"><h3>Prediction</h3><div class="f">${M(`<mover accent="true"><mi>y</mi><mo>^</mo></mover>`, mo('='), `<munder><mi>argmax</mi><mi>c</mi></munder>`, mi('I'), mo('·'), uc, mo(','), mt(' '), mi('margin'), mo('='), mi('I'), mo('·'), sb(mi('u'), mi('y')), mo('−'), `<munder><mi>max</mi><mrow><mi>c</mi><mo>≠</mo><mi>y</mi></mrow></munder>`, mi('I'), mo('·'), uc)}</div><p>The margin says how safely the true class wins. Accuracy hides it.</p></div>`;
+
+/* ---------- in-browser CLIP (worker) ---------- */
+const workerMain = `
+const E = createClipEngine(); let TOK = null;
+onmessage = e => { const m = e.data; try {
+  if (m.type === 'load'){ E.loadModel(m.kind, m.header, m.buffer); postMessage({type:'done', id:m.id}); }
+  else if (m.type === 'tok'){ TOK = createTokenizer(m.merges); postMessage({type:'done', id:m.id}); }
+  else if (m.type === 'text'){ const out = []; m.texts.forEach((t, i) => { out.push(E.encodeText(TOK.encode(t))); postMessage({type:'progress', id:m.id, p:(i + 1) / m.texts.length}); }); postMessage({type:'done', id:m.id, out}); }
+  else if (m.type === 'image'){ const emb = E.encodeImage(m.pixels, p => postMessage({type:'progress', id:m.id, p})); postMessage({type:'done', id:m.id, out:emb}); }
+} catch (err){ postMessage({type:'error', id:m.id, message:String(err && err.message || err)}); } };`;
+let worker = null, msgId = 0; const pending = new Map();
+function getWorker(){
+  if (worker) return worker;
+  worker = new Worker(URL.createObjectURL(new Blob([$('engine-src').textContent, workerMain], {type:'text/javascript'})));
+  worker.onmessage = e => { const m = e.data, p = pending.get(m.id); if (!p) return; if (m.type === 'progress') return p.onProgress && p.onProgress(m.p); pending.delete(m.id); m.type === 'error' ? p.reject(new Error(m.message)) : p.resolve(m.out); };
+  return worker;
+}
+function call(msg, transfer = [], onProgress){ return new Promise((resolve, reject) => { const id = ++msgId; pending.set(id, {resolve, reject, onProgress}); getWorker().postMessage({...msg, id}, transfer); }); }
+const loaded = {}, loading = {};
+async function cachedFetch(url){
+  let cache = null; try { cache = await caches.open('clip-vitb32-int8-v1'); } catch {}
+  if (cache){ try { const hit = await cache.match(url); if (hit) return hit; } catch {} }
+  const r = await fetch(url); if (!r.ok) throw new Error(`Could not download ${url} (HTTP ${r.status}).`);
+  if (cache){ try { await cache.put(url, r.clone()); } catch {} }
+  return r;
+}
+function ensure(kind, report){
+  if (loaded[kind]) return Promise.resolve();
+  if (loading[kind]) return loading[kind];
+  return loading[kind] = (async () => {
+    const header = await (await cachedFetch(`model/${kind}.json`)).json();
+    const buf = new ArrayBuffer(header.bytes), u8 = new Uint8Array(buf); let off = 0;
+    for (const c of header.chunks){ const b = new Uint8Array(await (await cachedFetch(`model/${c}`)).arrayBuffer()); u8.set(b, off); off += b.length; report && report(`Downloading ${kind === 'text' ? 'text' : 'image'} encoder… ${(off / 1e6).toFixed(0)} / ${(header.bytes / 1e6).toFixed(0)} MB`, off / header.bytes); }
+    await call({type:'load', kind, header, buffer:buf}, [buf]);
+    if (kind === 'text') await call({type:'tok', merges:await (await cachedFetch('model/bpe_merges.txt')).text()});
+    loaded[kind] = true;
+  })().catch(err => { loading[kind] = null; throw err; });
+}
+
+/* ---------- text vectors: precomputed cache + live encoding ---------- */
+const TEXT = new Map();
+async function encodeTexts(texts, report){
+  const todo = [...new Set(texts)].filter(t => !TEXT.has(t));
+  if (!todo.length) return;
+  await ensure('text', report);
+  for (let i = 0; i < todo.length; i += 16){
+    const chunk = todo.slice(i, i + 16);
+    const out = await call({type:'text', texts:chunk}, [], p => report && report(`Encoding new text ${Math.min(todo.length, i + Math.ceil(p * chunk.length))} of ${todo.length}…`, (i + p * chunk.length) / todo.length));
+    chunk.forEach((t, j) => TEXT.set(t, Float32Array.from(out[j])));
+  }
+}
+const missing = texts => [...new Set(texts)].filter(t => !TEXT.has(t)).length;
+function reporter(btnId, progId, label){
+  const btn = $(btnId), pg = $(progId);
+  return {start(){ btn.disabled = true; pg.hidden = false; pg.firstElementChild.style.width = '0'; },
+    report(msg, f){ btn.textContent = msg; pg.firstElementChild.style.width = Math.round(f * 100) + '%'; },
+    end(){ btn.disabled = false; btn.textContent = label; pg.hidden = true; }};
+}
+
+/* ---------- data ---------- */
+let D = null, PHOTOS = null, SETS = {};
+async function loadSet(key){
+  if (SETS[key]) return SETS[key];
+  const d = await (await fetch(key === 'photos4' ? 'data/photos.json' : 'data/caltech50.json')).json();
+  const V = unpack(d.vecs), imgs = d.items.map((it, i) => ({...it, i, v:V.subarray(i * DIM, i * DIM + DIM)})).filter(it => it.kind === 'image');
+  return SETS[key] = {key, atlas:d.atlas, n:imgs.length, imgs, defaults:D.sets[key].classes};
+}
+
+/* ---------- part 1 ---------- */
+let photoK = 28, upload = null;
+const DPRE = [['phrasing', 'Phrasing'], ['context', 'Context'], ['detail', 'Detail'], ['medium', 'Medium']];
+function currentImage(){ return upload || {label:PHOTOS.imgs[photoK].caption, v:PHOTOS.imgs[photoK].v}; }
+function drawImage1(){
+  const d = $('drop1');
+  if (upload) d.innerHTML = `<img src="${upload.url}" alt="Your image"><span class="src">${esc(upload.label)}</span>`;
+  else { const it = PHOTOS.imgs[photoK]; d.innerHTML = `<div class="bg" role="img" aria-label="${esc(it.caption)}" style="${bg(PHOTOS.atlas, PHOTOS.n, it.thumb)}"></div><span class="src">${esc(it.caption)}</span>`; }
+}
+function descLines(){ return [...new Set($('desc').value.split('\n').map(s => s.trim()).filter(Boolean))].slice(0, 10); }
+function updateNeed1(){ const n = missing(descLines()), needImg = upload && !upload.v; $('need1').textContent = n || needImg ? `Needs CLIP in this browser: ${n ? n + ' new line' + (n > 1 ? 's' : '') : ''}${n && needImg ? ' + ' : ''}${needImg ? 'your image' : ''}.` : 'All lines are precomputed.'; }
+function render1(){
+  const lines = descLines(), img = currentImage();
+  if (!img.v || lines.some(t => !TEXT.has(t))){ $('res1').innerHTML = ''; $('note1').textContent = ''; updateNeed1(); return; }
+  const rows = lines.map(t => ({t, s:dot(img.v, TEXT.get(t))}));
+  const lo = Math.min(...rows.map(r => r.s)) - .015, hi = Math.max(...rows.map(r => r.s)), best = rows.reduce((a, b) => b.s > a.s ? b : a);
+  $('res1').innerHTML = rows.map(r => `<div class="res${r === best ? ' win' : ''}"><div class="cap">${esc(r.t)}</div><div class="bar"><b style="width:${Math.max(2, (r.s - lo) / (hi - lo || 1) * 100)}%"></b></div><div class="num">${fmt(r.s)}<small>cosine</small></div></div>`).join('');
+  let minTT = 1; for (let a = 0; a < lines.length; a++) for (let b = a + 1; b < lines.length; b++) minTT = Math.min(minTT, dot(TEXT.get(lines[a]), TEXT.get(lines[b])));
+  $('note1').innerHTML = `These are cosine similarities, not probabilities. Range across the wordings: <b>${fmt(hi - lo - .015)}</b>, from ${fmt(lo + .015)} to ${fmt(hi)}. The most different pair of descriptions has a text-to-text cosine of <b>${minTT.toFixed(3)}</b>.`;
+  updateNeed1();
+}
+$('desc').addEventListener('input', render1);
+$('p-prev').addEventListener('click', () => { upload = null; photoK = (photoK + PHOTOS.n - 1) % PHOTOS.n; drawImage1(); render1(); });
+$('p-next').addEventListener('click', () => { upload = null; photoK = (photoK + 1) % PHOTOS.n; drawImage1(); render1(); });
+$('run1').addEventListener('click', async () => {
+  const lines = descLines(); if (lines.length < 2){ showErr('err1', 'Write at least two descriptions, one per line.'); return; }
+  showErr('err1', ''); const r = reporter('run1', 'prog1', 'Score descriptions'); r.start();
+  try {
+    if (upload && !upload.v){
+      await ensure('vision', r.report); r.report('Encoding your image…', 0);
+      const px = upload.pixels.slice(); upload.v = Float32Array.from(await call({type:'image', pixels:px}, [px.buffer], p => r.report(`Encoding your image… ${Math.round(p * 100)}%`, p)));
+    }
+    await encodeTexts(lines, r.report); render1();
+  } catch (e){ showErr('err1', `${e.message} Check your connection and try again.`); }
+  finally { r.end(); updateNeed1(); }
+});
+function preprocess(im){
+  let src = im, w = im.naturalWidth, h = im.naturalHeight;
+  while (Math.min(w, h) * .5 > 224){ const c = document.createElement('canvas'); c.width = Math.round(w / 2); c.height = Math.round(h / 2); const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height); src = c; w = c.width; h = c.height; }
+  const s = 224 / Math.min(w, h), dw = w * s, dh = h * s, c = document.createElement('canvas'); c.width = c.height = 224; const x = c.getContext('2d');
+  x.imageSmoothingQuality = 'high'; x.drawImage(src, (224 - dw) / 2, (224 - dh) / 2, dw, dh);
+  const d = x.getImageData(0, 0, 224, 224).data, out = new Float32Array(3 * 224 * 224), mean = [0.48145466, 0.4578275, 0.40821073], std = [0.26862954, 0.26130258, 0.27577711];
+  for (let i = 0; i < 224 * 224; i++) for (let ch = 0; ch < 3; ch++) out[ch * 224 * 224 + i] = (d[i * 4 + ch] / 255 - mean[ch]) / std[ch];
+  return out;
+}
+function useFile(file){
+  if (!file || !file.type.startsWith('image/')){ showErr('err1', 'Choose an image file (JPEG, PNG, WebP or GIF).'); return; }
+  const url = URL.createObjectURL(file), im = new Image();
+  im.onload = () => { upload = {url, label:file.name || 'pasted image', pixels:preprocess(im), v:null}; showErr('err1', ''); drawImage1(); render1(); };
+  im.onerror = () => showErr('err1', 'That file could not be read as an image. Try a JPEG or PNG.');
+  im.src = url;
+}
+$('file1').addEventListener('change', e => useFile(e.target.files[0]));
+$('drop1').addEventListener('dragover', e => { e.preventDefault(); $('drop1').classList.add('over'); });
+$('drop1').addEventListener('dragleave', () => $('drop1').classList.remove('over'));
+$('drop1').addEventListener('drop', e => { e.preventDefault(); $('drop1').classList.remove('over'); useFile(e.dataTransfer.files[0]); });
+document.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/')); if (f) useFile(f); });
+
+/* ---------- part 2 ---------- */
+let S = null, R = null, selImg = null;
+const TPRE = [['project', 'Project default (5)'], ['clip7', 'CLIP’s 7 for ImageNet'], ['offdomain', 'Off-domain (4)']];
+function readInputs(){
+  const classes = [...new Set($('classes').value.split('\n').map(s => s.trim()).filter(Boolean))];
+  const templates = [...new Set($('templates').value.split('\n').map(s => s.trim()).filter(Boolean))];
+  const single = $('single').value.trim();
+  const bad = [single, ...templates].find(t => t.split('{}').length !== 2 || /[{}]/.test(t.replace('{}', '')));
+  if (bad !== undefined) return {error:`“${bad}” needs exactly one {} placeholder, e.g. “a photo of a {}”.`};
+  if (!classes.length) return {error:'Enter at least one class label.'};
+  if (!templates.length) return {error:'Enter at least one ensemble template.'};
+  const evalImgs = S.imgs.filter(it => classes.includes(it.label));
+  if (!evalImgs.length) return {error:`None of the images carry these labels. Labels in this set: ${S.defaults.join(', ')}.`};
+  const prompts = [...classes, ...classes.map(c => single.replace('{}', c)), ...classes.flatMap(c => templates.map(t => t.replace('{}', c)))];
+  return {classes, templates, single, evalImgs, prompts};
+}
+function updateNeed2(){
+  const inp = readInputs();
+  if (inp.error){ $('need2').textContent = ''; return inp; }
+  const n = missing(inp.prompts);
+  $('need2').textContent = n ? `Needs CLIP in this browser: ${n} new prompt${n > 1 ? 's' : ''} to encode (about ${Math.max(1, Math.round(n * .35))} s).` : 'All prompts are precomputed.';
+  const unused = S.defaults.filter(c => !inp.classes.includes(c)).length, extra = inp.classes.filter(c => !S.defaults.includes(c));
+  $('cls-note').textContent = `${inp.evalImgs.length} images are evaluated: those whose label is in this list.${extra.length ? ` ${extra.length} label${extra.length > 1 ? 's have' : ' has'} no images and act only as distractors.` : ''}${unused ? ` ${unused} of the set’s labels are left out.` : ''}`;
+  return inp;
+}
+function compute(inp){
+  const {classes, templates, single, evalImgs} = inp;
+  const U = {
+    raw:classes.map(c => TEXT.get(c)),
+    single:classes.map(c => TEXT.get(single.replace('{}', c))),
+    ens:classes.map(c => { const acc = new Float32Array(DIM); for (const t of templates){ const v = TEXT.get(t.replace('{}', c)); for (let k = 0; k < DIM; k++) acc[k] += v[k] / templates.length; } return normalize(acc); }),
+  };
+  const res = {};
+  for (const k of ['raw', 'single', 'ens']){
+    const per = evalImgs.map(it => {
+      const s = U[k].map(u => dot(it.v, u)), y = classes.indexOf(it.label);
+      let p = 0; for (let c = 1; c < s.length; c++) if (s[c] > s[p]) p = c;
+      let other = -Infinity; s.forEach((v, c) => { if (c !== y && v > other) other = v; });
+      return {pred:p, ok:p === y, margin:s[y] - (classes.length > 1 ? other : 0), s};
+    });
+    res[k] = {per, acc:per.filter(r => r.ok).length / per.length, margin:per.reduce((a, r) => a + r.margin, 0) / per.length};
+  }
+  return {...inp, U, res};
+}
+function render2(){
+  const inp = updateNeed2();
+  if (inp.error){ showErr('err2', inp.error); return; }
+  showErr('err2', '');
+  if (missing(inp.prompts)){
+    R = null; ['metrics', 'dots', 'flips', 'closeup'].forEach(id => $(id).innerHTML = ''); $('flip-note').textContent = '';
+    $('metric-note').textContent = 'Results appear once the new prompts are encoded. Press “Compare strategies”.'; return;
+  }
+  R = compute(inp);
+  const {res, classes, evalImgs} = R;
+  $('metrics').innerHTML = ['raw', 'single', 'ens'].map(k => {
+    const d = res[k].acc - res.raw.acc, cnt = res[k].per.filter(r => r.ok).length;
+    return `<div class="metric"><div class="h"><i class="sw-${k}"></i>${NAMES[k]}</div><div class="n">${(res[k].acc * 100).toFixed(1)}%</div><div class="d">${cnt} / ${evalImgs.length} correct${k === 'raw' ? '' : ` · <b class="${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${d > 0 ? '+' : d < 0 ? '−' : '±'}${Math.abs(d * 100).toFixed(1)} pts</b> vs raw`}</div><div class="d">mean margin ${fmt(res[k].margin)}</div></div>`;
+  }).join('');
+  $('metric-note').textContent = `Descriptive accuracy on these ${evalImgs.length} labeled images only, not a benchmark estimate. An ensemble is not guaranteed to help.`;
+  // per-class accuracy, classes with the largest spread
+  const pc = classes.map((c, ci) => {
+    const idx = evalImgs.map((it, i) => it.label === c ? i : -1).filter(i => i >= 0);
+    if (!idx.length) return null;
+    const a = {}; for (const k of ['raw', 'single', 'ens']) a[k] = idx.filter(i => res[k].per[i].ok).length / idx.length;
+    return {c, n:idx.length, a, spread:Math.max(a.raw, a.single, a.ens) - Math.min(a.raw, a.single, a.ens)};
+  }).filter(Boolean).sort((x, y) => y.spread - x.spread || x.c.localeCompare(y.c));
+  const top = pc.filter(r => r.spread > 0).slice(0, 12);
+  if (!top.length) $('dots').innerHTML = '<p class="small">Every class has the same accuracy under all three strategies here. Try the Caltech set or the off-domain templates.</p>';
+  else {
+    const W = 700, left = 170, right = 30, rowH = 30, top0 = 10, H = top0 + rowH * top.length + 34, x = v => left + v * (W - left - right);
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Per-class accuracy under the three strategies, for classes where they differ">`;
+    for (let t = 0; t <= 100; t += 25){ const X = x(t / 100); s += `<line x1="${X}" x2="${X}" y1="${top0 - 4}" y2="${top0 + rowH * top.length}" stroke="#283142"/><text x="${X}" y="${H - 14}" fill="#8d95a2" font-family="JetBrains Mono, monospace" font-size="11" text-anchor="middle">${t}%</text>`; }
+    s += `<text x="${W - right}" y="${H - 1}" fill="#8d95a2" font-family="JetBrains Mono, monospace" font-size="11" text-anchor="end">accuracy within the class →</text>`;
+    top.forEach((r, i) => {
+      const cy = top0 + rowH * i + rowH / 2, vals = ['raw', 'single', 'ens'].map(k => r.a[k]);
+      s += `<text x="${left - 12}" y="${cy + 5}" fill="#ece6da" font-family="STIX Two Text, Georgia, serif" font-size="15" text-anchor="end">${esc(r.c)} <tspan fill="#8d95a2" font-size="11">(${r.n})</tspan></text>`;
+      s += `<line x1="${x(Math.min(...vals))}" x2="${x(Math.max(...vals))}" y1="${cy}" y2="${cy}" stroke="#8d95a2" stroke-opacity=".5" stroke-width="2"/>`;
+      ['raw', 'single', 'ens'].forEach((k, j) => { s += `<circle cx="${x(r.a[k])}" cy="${cy + (j - 1) * 3}" r="6" fill="${COL[k]}" fill-opacity=".92" stroke="#0e1116" stroke-width="1.5"><title>${NAMES[k]}: ${(r.a[k] * 100).toFixed(0)}%</title></circle>`; });
+    });
+    $('dots').innerHTML = s + '</svg>';
+  }
+  // flips
+  const flips = evalImgs.map((it, i) => ({it, i})).filter(({i}) => new Set(['raw', 'single', 'ens'].map(k => res[k].per[i].pred)).size > 1 || new Set(['raw', 'single', 'ens'].map(k => res[k].per[i].ok)).size > 1);
+  $('flip-note').textContent = flips.length ? `${flips.length} of ${evalImgs.length} images get a different answer depending on the wording. Click one to see its scores.` : 'All three strategies give the same answer for every image.';
+  const shown = flips.slice(0, 30);
+  if (!selImg || !shown.some(f => f.i === selImg)) selImg = shown.length ? shown[0].i : 0;
+  $('flips').innerHTML = shown.map(({it, i}) => `<button class="flip" type="button" data-i="${i}" aria-pressed="${i === selImg}"><span class="im" style="${bg(S.atlas, S.atlasN, it.thumb)}"></span><span class="lb">${esc(it.label)}</span><span class="pr">${['raw', 'single', 'ens'].map(k => `<span class="${res[k].per[i].ok ? 'ok' : 'no'}">${k === 'ens' ? 'ens' : k}: ${esc(classes[res[k].per[i].pred])}</span>`).join('<br>')}</span></button>`).join('');
+  $('flips').querySelectorAll('[data-i]').forEach(b => b.addEventListener('click', () => { selImg = +b.dataset.i; $('flips').querySelectorAll('[data-i]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderCloseup(); }));
+  renderCloseup();
+}
+function renderCloseup(){
+  if (!R) return;
+  const {res, classes, evalImgs} = R, it = evalImgs[selImg]; if (!it) return;
+  const s = {}; for (const k of ['raw', 'single', 'ens']) s[k] = res[k].per[selImg].s;
+  const order = classes.map((c, ci) => ci).sort((a, b) => Math.max(s.raw[b], s.single[b], s.ens[b]) - Math.max(s.raw[a], s.single[a], s.ens[a])).slice(0, 6);
+  if (!order.includes(classes.indexOf(it.label))) order[order.length - 1] = classes.indexOf(it.label);
+  const all = order.flatMap(ci => ['raw', 'single', 'ens'].map(k => s[k][ci])), lo = Math.min(...all) - .01, hi = Math.max(...all);
+  $('closeup').innerHTML = `<div><div class="im" style="${bg(S.atlas, S.atlasN, it.thumb)}" role="img" aria-label="${esc(it.label)}"></div><p class="small" style="margin-top:6px">True label: <b style="color:var(--green)">${esc(it.label)}</b></p></div>
+    <div class="gbars">${order.map(ci => `<div class="gb"><div class="c${classes[ci] === it.label ? ' true' : ''}">${esc(classes[ci])}</div><div class="bs">${['raw', 'single', 'ens'].map(k => `<div><span class="t"><b style="width:${Math.max(2, (s[k][ci] - lo) / (hi - lo || 1) * 100)}%;background:${COL[k]}"></b></span>${fmt(s[k][ci])}</div>`).join('')}</div></div>`).join('')}
+    <p class="small">Cosine of this image with each class vector, for the six highest-scoring classes. Within each group: raw, single template, ensemble.</p></div>`;
+}
+async function setSet(key){
+  S = await loadSet(key); S.atlasN = S.key === 'photos4' ? PHOTOS.n : S.n;
+  $('classes').value = S.defaults.join('\n'); selImg = null; render2();
+}
+document.querySelectorAll('input[name=set]').forEach(r => r.addEventListener('change', () => setSet(r.value)));
+let t2 = 0; ['classes', 'templates', 'single'].forEach(id => $(id).addEventListener('input', () => { clearTimeout(t2); t2 = setTimeout(render2, 250); }));
+$('run2').addEventListener('click', async () => {
+  const inp = updateNeed2(); if (inp.error){ showErr('err2', inp.error); return; }
+  const r = reporter('run2', 'prog2', 'Compare strategies'); r.start();
+  try { await encodeTexts(inp.prompts, r.report); render2(); }
+  catch (e){ showErr('err2', `${e.message} Check your connection and try again.`); }
+  finally { r.end(); updateNeed2(); }
+});
+
+/* ---------- boot ---------- */
+(async () => {
+  D = await (await fetch('data/prompts.json')).json();
+  const V = unpack(D.vecs); D.texts.forEach((t, i) => TEXT.set(t, V.subarray(i * DIM, i * DIM + DIM)));
+  PHOTOS = await loadSet('photos4'); PHOTOS = {...PHOTOS, imgs:PHOTOS.imgs, n:PHOTOS.imgs.length};
+  $('d-presets').innerHTML = DPRE.map(([k, n]) => `<button type="button" data-k="${k}">${n}</button>`).join('');
+  $('d-presets').addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (!b) return; upload = null; photoK = 28; drawImage1(); $('desc').value = D.descriptions[b.dataset.k].join('\n'); render1(); });
+  $('s-presets').innerHTML = D.singles.map((t, i) => `<button type="button" data-i="${i}">${esc(t)}</button>`).join('');
+  $('s-presets').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; $('single').value = D.singles[+b.dataset.i]; render2(); });
+  $('t-presets').innerHTML = TPRE.map(([k, n]) => `<button type="button" data-k="${k}">${n}</button>`).join('');
+  $('t-presets').addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (!b) return; $('templates').value = D.template_sets[b.dataset.k].join('\n'); render2(); });
+  $('desc').value = D.descriptions.phrasing.join('\n'); drawImage1(); render1();
+  $('single').value = D.singles[0]; $('templates').value = D.template_sets.project.join('\n');
+  await setSet('caltech50');
+})().catch(() => showErr('err2', 'The precomputed data did not load. Reload the page to try again.'));
+})();
+</script>
+</body>
+</html>

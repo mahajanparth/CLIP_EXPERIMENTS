@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CLIP Embedding Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: control strip, then plot + inspector side by side (stacked on narrow screens), then three explainer columns. Same dark 3Blue1Brown palette as the walkthrough. */
+:root{
+  --bg:#0e1116; --surface:#161b24; --ink:#ece6da; --muted:#8d95a2; --line:#283142;
+  --blue:#58c4dd; --gold:#d99a4e; --yellow:#f4e07a; --green:#83c167; --red:#fc6255;
+  --serif:"STIX Two Text","STIX Two","Cambria Math",Georgia,serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--bg);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.55}
+img{max-width:100%}
+[hidden]{display:none!important}
+a{color:var(--blue)}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:28px 64px;display:grid;gap:24px}
+.back{font-family:var(--mono);font-size:13px;color:var(--muted);text-decoration:none}
+.back:hover{color:var(--blue)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:14px 0 0}
+h1{font-size:clamp(2rem,4.6vw,3rem);font-weight:400;line-height:1.1;margin:.2em 0 .25em;text-wrap:balance}
+h1 em{color:var(--blue)}
+.lede{color:var(--muted);max-width:66ch;margin:0}
+.controls{display:flex;flex-wrap:wrap;gap:14px 26px;align-items:flex-end}
+fieldset{border:0;margin:0;padding:0;min-width:0}
+legend,.lab{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;padding:0}
+.segs{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+.segs label{position:relative;cursor:pointer}
+.segs input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.segs span{display:block;padding:7px 13px;font-family:var(--mono);font-size:13px;color:var(--muted);background:var(--bg);border-right:1px solid var(--line)}
+.segs label:last-child span{border-right:0}
+.segs input:checked+span{background:var(--surface);color:var(--ink);box-shadow:inset 0 -2px 0 var(--blue)}
+.segs input:focus-visible+span{outline:2px solid var(--yellow);outline-offset:-2px}
+.checks{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:13px}
+.checks label{display:flex;gap:7px;align-items:center;cursor:pointer}
+input[type=checkbox]{accent-color:var(--blue);width:16px;height:16px}
+.tsne-ctl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-family:var(--mono);font-size:13px;color:var(--muted)}
+.tsne-ctl input[type=range]{accent-color:var(--gold);width:140px}
+.tsne-ctl output{color:var(--gold);min-width:2ch;font-variant-numeric:tabular-nums}
+button.plain{font-family:var(--mono);font-size:13px;padding:7px 13px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+button.plain:hover{border-color:var(--gold)}
+:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.viz{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:20px;align-items:start}
+@media (max-width:880px){.viz{grid-template-columns:minmax(0,1fr)}}
+.plot{position:relative;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--bg)}
+canvas{display:block;width:100%;aspect-ratio:4/3;max-width:100%;cursor:crosshair}
+@media (max-width:560px){canvas{aspect-ratio:1/1}}
+.plot-col{display:grid;gap:8px;min-width:0}
+.plot-head{display:flex;justify-content:space-between;align-items:baseline;gap:6px 18px;flex-wrap:wrap}
+.status{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:0}
+.status b{color:var(--ink);font-weight:500}
+.legend{display:flex;gap:14px;font-family:var(--mono);font-size:12px;color:var(--muted);flex-wrap:wrap}
+.hint{position:absolute;right:10px;bottom:8px;font-family:var(--mono);font-size:11px;color:var(--muted);pointer-events:none}
+.legend i{display:inline-block;width:11px;height:11px;margin-right:6px;vertical-align:-1px}
+.legend .im{border:2px solid var(--blue)}
+.legend .tx{background:var(--gold);border-radius:50%}
+.loading{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:13px;color:var(--muted)}
+.tip{position:absolute;pointer-events:none;max-width:260px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 10px;font-size:14px;line-height:1.35;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.tip small{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:2px;letter-spacing:.06em;text-transform:uppercase}
+aside{border:1px solid var(--line);border-radius:6px;padding:16px;display:grid;gap:14px;background:var(--surface);min-width:0}
+.kind{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.kind.image{color:var(--blue)} .kind.text{color:var(--gold)}
+.sel-head{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:start}
+.sel-head.textonly{grid-template-columns:minmax(0,1fr)}
+.thumb{width:96px;height:96px;border-radius:4px;background-repeat:no-repeat;border:2px solid var(--blue)}
+.sel-cap{font-size:1.08rem;line-height:1.35;margin:4px 0 0}
+.sel-cap.quote{font-style:italic;color:var(--ink)}
+.credit{font-size:12px;color:var(--muted);line-height:1.4;margin:6px 0 0;overflow-wrap:anywhere}
+.credit a{color:var(--muted)}
+h3{font-size:1rem;font-weight:600;margin:0}
+.sub{font-size:13px;color:var(--muted);margin:2px 0 0}
+.nn{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.nn button{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;padding:5px 6px;border-radius:5px;cursor:pointer}
+.nn button:hover{background:var(--bg)}
+.nn button:focus-visible{outline:2px solid var(--yellow)}
+.nn .mini{width:28px;height:28px;border-radius:3px;background-repeat:no-repeat}
+.nn .dot{width:10px;height:10px;border-radius:50%;background:var(--gold);justify-self:center}
+.nn .txt{font-size:14px;line-height:1.3;min-width:0;overflow-wrap:anywhere}
+.nn .txt em{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--green);margin-left:4px;white-space:nowrap}
+.nn .val{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;display:grid;justify-items:end;gap:3px}
+.nn .bar{height:3px;background:var(--line);width:54px;border-radius:2px;overflow:hidden}
+.nn .bar b{display:block;height:100%;background:var(--gold)}
+.nn .near{color:var(--blue);font-size:11px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.stat .n{font-family:var(--mono);font-size:1.15rem;font-variant-numeric:tabular-nums}
+.stat .d{font-size:12px;color:var(--muted);line-height:1.35}
+.explain{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px}
+.explain h2{font-size:1.25rem;font-weight:400;margin:0 0 6px}
+.explain h2 span{font-family:var(--mono);font-size:12px;color:var(--muted);margin-right:8px}
+.explain p{margin:0 0 8px;color:var(--ink);max-width:62ch}
+.explain p.m{color:var(--muted);font-size:.95rem}
+details{border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font-size:.92rem}
+summary{cursor:pointer;color:var(--ink)}
+.credits{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:6px 20px;margin-top:10px;font-size:13px;line-height:1.4}
+.credits div{overflow-wrap:anywhere}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <a class="back" href="index.html">← How CLIP Works</a>&nbsp;&nbsp;<a class="back" href="failures.html">CLIP’s Blind Spots →</a>&nbsp;&nbsp;<a class="back" href="prompts.html">Words Change the Experiment →</a>&nbsp;&nbsp;<a class="back" href="zeroshot.html">Zero-shot classifier →</a>
+    <p class="eyebrow">Real embeddings · OpenAI CLIP ViT-B/32 · 512 dimensions</p>
+    <h1>Embedding <em>Explorer</em></h1>
+    <p class="lede">Each real photo and each sentence was run through CLIP, giving a 512-number vector. This page squeezes those vectors down to two dimensions with PCA or t-SNE, computed live in your browser. Click any point to see what CLIP itself considers closest.</p>
+  </header>
+
+  <section class="controls" aria-label="Projection settings">
+    <fieldset><legend>Data</legend><div class="segs">
+      <label><input type="radio" name="ds" value="photos" checked><span>38 photos + captions</span></label>
+      <label><input type="radio" name="ds" value="caltech"><span>Caltech-101 · 12 classes</span></label>
+    </div></fieldset>
+    <fieldset><legend>Projection</legend><div class="segs">
+      <label><input type="radio" name="proj" value="pca" checked><span>PCA</span></label>
+      <label><input type="radio" name="proj" value="tsne"><span>t-SNE</span></label>
+    </div></fieldset>
+    <fieldset><legend>View</legend><div class="segs">
+      <label><input type="radio" name="dims" value="2" checked><span>2-D</span></label>
+      <label><input type="radio" name="dims" value="3"><span>3-D</span></label>
+    </div></fieldset>
+    <fieldset><legend>Points</legend><div class="segs">
+      <label><input type="radio" name="show" value="both" checked><span>Images + text</span></label>
+      <label><input type="radio" name="show" value="image"><span>Images</span></label>
+      <label><input type="radio" name="show" value="text"><span>Text</span></label>
+    </div></fieldset>
+    <div><div class="lab">Options</div><div class="checks">
+      <label><input type="checkbox" id="pairs" checked>Pair lines</label>
+      <label><input type="checkbox" id="gap">Remove modality gap</label>
+    </div></div>
+    <div id="view-ctl" hidden><div class="lab">3-D camera</div><div class="checks">
+      <label><input type="checkbox" id="spin" checked>Spin</label>
+      <button class="plain" id="reset-view" type="button">Reset view</button>
+    </div></div>
+    <div id="tsne-ctl" hidden><div class="lab">t-SNE</div><div class="tsne-ctl">
+      <label for="perp">Perplexity</label><input type="range" id="perp" min="3" max="40" step="1" value="12"><output id="perp-out" for="perp">12</output>
+      <button class="plain" id="rerun" type="button">New random start</button>
+    </div></div>
+  </section>
+
+  <section class="viz">
+    <div class="plot-col">
+    <div class="plot-head"><div class="status" id="status"></div><div class="legend"><span><i class="im"></i>image</span><span><i class="tx"></i>text</span></div></div>
+    <div class="plot" id="plot">
+      <canvas id="cv" aria-label="Projection of CLIP embeddings; click a point to inspect it"></canvas>
+      <div class="hint" id="hint" hidden>drag to rotate · scroll to zoom · click a point</div>
+      <div class="loading" id="loading">Loading embeddings…</div>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+    </div>
+    <aside id="panel" aria-live="polite"></aside>
+  </section>
+
+  <section class="explain">
+    <div>
+      <h2><span>PCA</span>Keep the widest directions</h2>
+      <p>PCA finds the two (or, in 3-D, three) directions along which the points spread out most, and drops the rest of the 512. It is linear and gives the same answer every time, so straight-line distances still mean something.</p>
+      <p class="m" id="pca-note">The cost: two axes hold only a fraction of the variance, so points that look close may differ along a dropped direction.</p>
+    </div>
+    <div>
+      <h2><span>t-SNE</span>Keep each point’s neighbours</h2>
+      <p>t-SNE turns distances into “who is my neighbour” probabilities, then moves points around in 2-D until those probabilities match. Perplexity is roughly how many neighbours each point pays attention to.</p>
+      <p class="m">Tight clusters are real. Gaps between clusters, cluster sizes, and the overall layout are not. Press “New random start” and the same data comes out arranged differently.</p>
+    </div>
+    <div>
+      <h2><span>Gap</span>Images and text sit apart</h2>
+      <p>With raw embeddings, images and sentences form two separate clouds, and PCA’s first axis mostly splits them. In both data sets every point’s nearest neighbour is from its own modality. Image–image cosines average about 0.5; the best image–caption match here is only 0.38.</p>
+      <p class="m">Matching still works because CLIP only compares an image against texts. Ticking “Remove modality gap” subtracts each modality’s mean vector; captions then land beside their photos. See Liang et al., <i>Mind the Gap</i>, NeurIPS 2022.</p>
+    </div>
+  </section>
+
+  <details>
+    <summary>Image credits</summary>
+    <div class="credits" id="credits"></div>
+  </details>
+</main>
+
+<script>
+(() => {
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C = {bg:css('--bg'), ink:css('--ink'), muted:css('--muted'), line:css('--line'), blue:css('--blue'), gold:css('--gold'), yellow:css('--yellow'), green:css('--green')};
+const SERIF = '"STIX Two Text", Georgia, serif', MONO = '"JetBrains Mono", ui-monospace, monospace';
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const DIM = 512, TSNE_ITERS = 1000, MAXN = 400;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function hexA(h, a){ h = h.replace('#',''); const n = parseInt(h, 16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+function mulberry(s){ return () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function niceTicks(lo, hi, want = 6){
+  const span = hi - lo; if (!(span > 0)) return [];
+  const raw = span / want, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
+  const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p, out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+  return out;
+}
+const fmtTick = v => { const a = Math.abs(v); return (v < 0 ? '−' : '') + (a >= 10 ? a.toFixed(0) : a >= 1 ? a.toFixed(1).replace(/\.0$/, '') : a.toFixed(2).replace(/0$/, '')); };
+
+/* ---------- data ---------- */
+const cache = {};
+async function loadDS(name){
+  if (cache[name]) return cache[name];
+  const d = await (await fetch(`data/${name}.json`)).json();
+  const bin = atob(d.vecs), u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  const i16 = new Int16Array(u8.buffer), V = new Float32Array(i16.length);
+  for (let i = 0; i < i16.length; i++) V[i] = i16[i] / 32767;
+  const img = new Image(); img.src = d.atlas.file; await img.decode().catch(() => {});
+  d.V = V; d.n = d.items.length; d.img = img;
+  // gap-removed copy: subtract each modality's mean, renormalize
+  const G = new Float32Array(V.length);
+  for (const kind of ['image', 'text']){
+    const ids = d.items.map((it, i) => it.kind === kind ? i : -1).filter(i => i >= 0), mu = new Float64Array(DIM);
+    for (const i of ids) for (let k = 0; k < DIM; k++) mu[k] += V[i * DIM + k] / ids.length;
+    for (const i of ids){ let s = 0; for (let k = 0; k < DIM; k++){ const x = V[i * DIM + k] - mu[k]; G[i * DIM + k] = x; s += x * x; } s = Math.sqrt(s); for (let k = 0; k < DIM; k++) G[i * DIM + k] /= s; }
+  }
+  d.G = G;
+  d.cos = (a, b) => { let s = 0; for (let k = 0; k < DIM; k++) s += V[a * DIM + k] * V[b * DIM + k]; return s; };
+  d.images = d.items.map((it, i) => it.kind === 'image' ? i : -1).filter(i => i >= 0);
+  d.texts = d.items.map((it, i) => it.kind === 'text' ? i : -1).filter(i => i >= 0);
+  let hit = 0;
+  for (const i of d.images){ let best = -1, bv = -9; for (const j of d.texts){ const c = d.cos(i, j); if (c > bv){ bv = c; best = j; } } if (best === d.items[i].pair) hit++; }
+  d.hit = hit;
+  return cache[name] = d;
+}
+
+/* ---------- PCA: top-3 components (Gram matrix + power iteration) ---------- */
+function pca3(X, m){
+  const K = 3, mu = new Float64Array(DIM);
+  for (let i = 0; i < m; i++) for (let k = 0; k < DIM; k++) mu[k] += X[i * DIM + k] / m;
+  const Xc = new Float64Array(m * DIM);
+  for (let i = 0; i < m; i++) for (let k = 0; k < DIM; k++) Xc[i * DIM + k] = X[i * DIM + k] - mu[k];
+  const G = new Float64Array(m * m); let tr = 0;
+  for (let i = 0; i < m; i++) for (let j = i; j < m; j++){ let s = 0; for (let k = 0; k < DIM; k++) s += Xc[i * DIM + k] * Xc[j * DIM + k]; G[i * m + j] = G[j * m + i] = s; if (i === j) tr += s; }
+  const us = [], ls = [];
+  for (let c = 0; c < K; c++){
+    const v = new Float64Array(m).map((_, i) => 1 + (i % 7) * .13 + c * (i % 3) - c * c * (i % 5) * .07);
+    let lam = 0;
+    for (let it = 0; it < 800; it++){
+      const w = new Float64Array(m);
+      for (let i = 0; i < m; i++){ let s = 0; for (let j = 0; j < m; j++) s += G[i * m + j] * v[j]; w[i] = s; }
+      for (let p = 0; p < us.length; p++){ let d = 0; for (let i = 0; i < m; i++) d += us[p][i] * w[i]; for (let i = 0; i < m; i++) w[i] -= d * us[p][i]; }
+      let nrm = 0; for (let i = 0; i < m; i++) nrm += w[i] * w[i]; nrm = Math.sqrt(nrm) || 1;
+      let diff = 0; for (let i = 0; i < m; i++){ const x = w[i] / nrm; diff += Math.abs(x - v[i]); v[i] = x; }
+      lam = nrm; if (diff < 1e-10) break;
+    }
+    let mi = 0; for (let i = 1; i < m; i++) if (Math.abs(v[i]) > Math.abs(v[mi])) mi = i;
+    if (v[mi] < 0) for (let i = 0; i < m; i++) v[i] = -v[i];
+    us.push(v); ls.push(lam);
+  }
+  const Y3 = new Float64Array(m * K);
+  for (let i = 0; i < m; i++) for (let c = 0; c < K; c++) Y3[K * i + c] = us[c][i] * Math.sqrt(ls[c]);
+  return {Y3, ratio:ls.map(l => l / tr), take(d){ const Y = new Float64Array(m * d); for (let i = 0; i < m; i++) for (let c = 0; c < d; c++) Y[d * i + c] = Y3[K * i + c]; return Y; }};
+}
+
+/* ---------- exact t-SNE in d = 2 or 3 dimensions ---------- */
+class TSNE {
+  constructor(X, m, perp, Y0, d){
+    this.m = m; this.d = d; this.iter = 0; this.kl = NaN;
+    const D = new Float64Array(m * m);
+    for (let i = 0; i < m; i++) for (let j = i + 1; j < m; j++){ let s = 0; for (let k = 0; k < DIM; k++){ const t = X[i * DIM + k] - X[j * DIM + k]; s += t * t; } D[i * m + j] = D[j * m + i] = s; }
+    const P = new Float64Array(m * m), Ht = Math.log(perp);
+    for (let i = 0; i < m; i++){
+      let beta = 1, lo = -Infinity, hi = Infinity;
+      for (let it = 0; it < 100; it++){
+        let sum = 0, sd = 0;
+        for (let j = 0; j < m; j++){ if (j === i) continue; const p = Math.exp(-D[i * m + j] * beta); P[i * m + j] = p; sum += p; sd += D[i * m + j] * p; }
+        sum = sum || 1e-300;
+        const H = Math.log(sum) + beta * sd / sum, diff = H - Ht;
+        for (let j = 0; j < m; j++) P[i * m + j] /= sum;
+        if (Math.abs(diff) < 1e-5) break;
+        if (diff > 0){ lo = beta; beta = hi === Infinity ? beta * 2 : (beta + hi) / 2; }
+        else { hi = beta; beta = lo === -Infinity ? beta / 2 : (beta + lo) / 2; }
+      }
+      P[i * m + i] = 0;
+    }
+    this.P = new Float64Array(m * m);
+    for (let i = 0; i < m; i++) for (let j = 0; j < m; j++) this.P[i * m + j] = i === j ? 0 : Math.max((P[i * m + j] + P[j * m + i]) / (2 * m), 1e-12);
+    this.Y = Float64Array.from(Y0); this.U = new Float64Array(m * d); this.gains = new Float64Array(m * d).fill(1);
+    this.NUM = new Float64Array(m * m); this.lr = Math.max(m / 12 / 4, 50);
+  }
+  get done(){ return this.iter >= TSNE_ITERS; }
+  step(){
+    const {m, d, Y, P, NUM, U, gains} = this, exag = this.iter < 250 ? 12 : 1, mom = this.iter < 250 ? .5 : .8;
+    let sumQ = 0;
+    for (let i = 0; i < m; i++) for (let j = i + 1; j < m; j++){
+      let s = 0; for (let c = 0; c < d; c++){ const t = Y[d*i+c] - Y[d*j+c]; s += t * t; }
+      const n = 1 / (1 + s); NUM[i*m+j] = NUM[j*m+i] = n; sumQ += 2 * n;
+    }
+    const g = new Float64Array(d);
+    for (let i = 0; i < m; i++){
+      g.fill(0);
+      for (let j = 0; j < m; j++){ if (j === i) continue; const n = NUM[i*m+j], f = (exag * P[i*m+j] - n / sumQ) * n; for (let c = 0; c < d; c++) g[c] += f * (Y[d*i+c] - Y[d*j+c]); }
+      for (let c = 0; c < d; c++){
+        const k = d * i + c, gr = 4 * g[c];
+        gains[k] = Math.sign(gr) !== Math.sign(U[k]) ? gains[k] + .2 : Math.max(.01, gains[k] * .8);
+        U[k] = mom * U[k] - this.lr * gains[k] * gr;
+      }
+    }
+    const mean = new Float64Array(d);
+    for (let i = 0; i < m; i++) for (let c = 0; c < d; c++){ Y[d*i+c] += U[d*i+c]; mean[c] += Y[d*i+c] / m; }
+    for (let i = 0; i < m; i++) for (let c = 0; c < d; c++) Y[d*i+c] -= mean[c];
+    this.iter++;
+    if (this.iter % 25 === 0 || this.done){
+      let kl = 0; for (let i = 0; i < m; i++) for (let j = 0; j < m; j++){ if (i === j) continue; const p = P[i*m+j]; kl += p * Math.log(p / Math.max(NUM[i*m+j] / sumQ, 1e-12)); }
+      this.kl = kl;
+    }
+  }
+}
+
+/* ---------- neighbour preservation ---------- */
+function knnHigh(X, m, k){
+  const out = [];
+  for (let i = 0; i < m; i++){
+    const dd = [];
+    for (let j = 0; j < m; j++){ if (j === i) continue; let s = 0; for (let q = 0; q < DIM; q++){ const t = X[i*DIM+q] - X[j*DIM+q]; s += t * t; } dd.push([s, j]); }
+    dd.sort((a, b) => a[0] - b[0]); out.push(new Set(dd.slice(0, k).map(x => x[1])));
+  }
+  return out;
+}
+function knnLow(Y, m, d, k, only){
+  const rows = only == null ? [...Array(m).keys()] : [only], out = [];
+  for (const i of rows){
+    const dd = [];
+    for (let j = 0; j < m; j++){ if (j === i) continue; let s = 0; for (let c = 0; c < d; c++){ const t = Y[d*i+c] - Y[d*j+c]; s += t * t; } dd.push([s, j]); }
+    dd.sort((a, b) => a[0] - b[0]); out.push(new Set(dd.slice(0, k).map(x => x[1])));
+  }
+  return out;
+}
+
+/* ---------- state ---------- */
+const CAM0 = {yaw:-.65, pitch:.38, zoom:1};
+const S = {ds:'photos', proj:'pca', dims:2, show:'both', pairs:true, gap:false, perp:12, seed:0, sel:0, hover:-1, spin:!RM, ...CAM0};
+let D = null, idx = [], X = null, pca = null, tsne = null, layout = null, hiKNN = null, overlap = null, fit = null;
+// smoothed positions live in normalized layout space (−1…1 on the widest axis); the camera projects them every frame
+const disp = {p:new Float64Array(MAXN * 3), a:new Float64Array(MAXN), init:false};
+const scr = {x:new Float64Array(MAXN), y:new Float64Array(MAXN), z:new Float64Array(MAXN), k:new Float64Array(MAXN).fill(1)};
+if (RM) $('spin').checked = false;
+
+function buildSet(){
+  idx = D.items.map((it, i) => (S.show === 'both' || it.kind === S.show) ? i : -1).filter(i => i >= 0);
+  const src = S.gap ? D.G : D.V, m = idx.length;
+  X = new Float32Array(m * DIM);
+  idx.forEach((g, i) => X.set(src.subarray(g * DIM, g * DIM + DIM), i * DIM));
+  pca = pca3(X, m); hiKNN = knnHigh(X, m, 5);
+  const maxPerp = Math.max(2, Math.floor((m - 1) / 3));
+  $('perp').max = Math.min(40, maxPerp);
+  if (S.perp > maxPerp){ S.perp = maxPerp; $('perp').value = maxPerp; $('perp-out').textContent = maxPerp; }
+}
+function startProjection(){
+  const m = idx.length, d = S.dims; overlap = null;
+  if (S.proj === 'pca'){ tsne = null; layout = pca.take(d); finishLayout(); }
+  else {
+    let Y0;
+    if (S.seed === 0){
+      const P = pca.take(d); let sd = 0, mu = 0;
+      for (let i = 0; i < m; i++) mu += P[d*i] / m; for (let i = 0; i < m; i++) sd += (P[d*i] - mu) ** 2 / m; sd = Math.sqrt(sd) || 1;
+      Y0 = P.map(v => v / sd * 1e-4);
+    } else {
+      const r = mulberry(S.seed * 9973);
+      Y0 = new Float64Array(m * d).map(() => { const u = r() || 1e-9, v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) * 1e-4; });
+    }
+    tsne = new TSNE(X, m, S.perp, Y0, d); layout = tsne.Y;
+    if (RM){ while (!tsne.done) tsne.step(); finishLayout(); }
+  }
+  updateStatus(); renderPanel(); kick();
+}
+function finishLayout(){
+  const m = idx.length, lo = knnLow(layout, m, S.dims, 5);
+  let s = 0; for (let i = 0; i < m; i++){ let c = 0; for (const j of lo[i]) if (hiKNN[i].has(j)) c++; s += c / 5; }
+  overlap = s / m; updateStatus(); renderPanel();
+}
+async function setDataset(name){
+  $('loading').hidden = false;
+  D = await loadDS(name); S.ds = name; $('loading').hidden = true;
+  S.sel = D.images[0]; disp.init = false;
+  renderCredits(); buildSet(); startProjection();
+}
+
+/* ---------- canvas ---------- */
+const cv = $('cv'), ctx = cv.getContext('2d');
+let CW = 800, CH = 600, raf = 0;
+function kick(){ if (!raf) raf = requestAnimationFrame(frame); }
+function resize(){
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+  CW = r.width; CH = r.height; cv.width = Math.round(CW * dpr); cv.height = Math.round(CH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); kick();
+}
+new ResizeObserver(resize).observe(cv);
+
+function computeFit(){
+  const m = idx.length, d = S.dims, lo = [0, 0, 0], hi = [0, 0, 0];
+  for (let c = 0; c < d; c++){ lo[c] = Infinity; hi[c] = -Infinity; }
+  for (let i = 0; i < m; i++) for (let c = 0; c < d; c++){ const v = layout[d*i+c]; if (v < lo[c]) lo[c] = v; if (v > hi[c]) hi[c] = v; }
+  const cen = lo.map((l, c) => (l + hi[c]) / 2), half = lo.map((l, c) => (hi[c] - l) / 2);
+  const R = Math.max(...half) || 1e-9;
+  return {cen, R, e:half.map(h => h / R)};
+}
+
+// 2-D plot rectangle and scale (equal units on both axes)
+function frame2D(){
+  const padL = 58, padR = 18, padT = 16, padB = 52, w = CW - padL - padR, h = CH - padT - padB;
+  const ex = Math.max(fit.e[0], .05), ey = Math.max(fit.e[1], .05), sc = Math.min(w / (2 * ex), h / (2 * ey)) * .94;
+  return {padL, padT, w, h, sc, ox:padL + w / 2, oy:padT + h / 2};
+}
+// 3-D orbit camera: yaw about the vertical axis, pitch about the horizontal, mild perspective
+function camera(){
+  const cy = Math.cos(S.yaw), sy = Math.sin(S.yaw), cp = Math.cos(S.pitch), sp = Math.sin(S.pitch);
+  const unit = Math.min(CW, CH) * .34 * S.zoom, ox = CW / 2, oy = CH / 2 + 6, dist = 5;
+  return (x, y, z) => {
+    const x1 = x * cy + z * sy, z1 = -x * sy + z * cy;
+    const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp, k = dist / (dist - z2);
+    return [ox + x1 * unit * k, oy - y2 * unit * k, z2, k];
+  };
+}
+
+let dragging = null;
+function frame(){
+  raf = 0;
+  if (!D || !layout) return;
+  let busy = false;
+  if (tsne && !tsne.done){ for (let s = 0; s < (S.dims === 3 ? 4 : 6) && !tsne.done; s++) tsne.step(); if (tsne.done) finishLayout(); updateStatus(); busy = true; }
+  fit = computeFit();
+  const d = S.dims, kk = RM || !disp.init ? 1 : .16, inSet = new Map(idx.map((g, i) => [g, i]));
+  for (let g = 0; g < D.n; g++){
+    const i = inSet.get(g), ta = i == null ? 0 : 1;
+    if (i != null){
+      const fresh = disp.a[g] < .05;
+      for (let c = 0; c < 3; c++){
+        const t = c < d ? (layout[d*i+c] - fit.cen[c]) / fit.R : 0, o = 3 * g + c;
+        const nv = fresh ? t : disp.p[o] + (t - disp.p[o]) * kk;
+        if (Math.abs(nv - t) > 1e-3) busy = true;
+        disp.p[o] = nv;
+      }
+    }
+    const na = disp.a[g] + (ta - disp.a[g]) * (RM ? 1 : .2);
+    if (Math.abs(na - ta) > .01) busy = true;
+    disp.a[g] = Math.abs(na - ta) < .01 ? ta : na;
+  }
+  disp.init = true;
+  if (d === 3 && S.spin && !dragging){ S.yaw += .0035; busy = true; }
+  if (d === 2){
+    const f = frame2D();
+    for (let g = 0; g < D.n; g++){ scr.x[g] = f.ox + disp.p[3*g] * f.sc; scr.y[g] = f.oy - disp.p[3*g+1] * f.sc; scr.z[g] = 0; scr.k[g] = 1; }
+    draw(f, null);
+  } else {
+    const cam = camera();
+    for (let g = 0; g < D.n; g++){ const [x, y, z, k] = cam(disp.p[3*g], disp.p[3*g+1], disp.p[3*g+2]); scr.x[g] = x; scr.y[g] = y; scr.z[g] = z; scr.k[g] = k; }
+    draw(null, cam);
+  }
+  if (busy) raf = requestAnimationFrame(frame);
+}
+
+function axisNames(){
+  if (S.proj === 'pca') return [0, 1, 2].map(c => `PC${c + 1} · ${(pca.ratio[c] * 100).toFixed(1)}%`);
+  return ['t-SNE 1', 't-SNE 2', 't-SNE 3'];
+}
+
+function drawAxes2D(f){
+  const {padL, padT, w, h, sc, ox, oy} = f, {cen, R} = fit, names = axisNames();
+  const toData = (px, c) => cen[c] + (c === 0 ? (px - ox) / sc : (oy - px) / sc) * R;
+  const xs = niceTicks(toData(padL, 0), toData(padL + w, 0)), ys = niceTicks(toData(padT + h, 1), toData(padT, 1));
+  const X0 = padL - 8, Y0 = padT + h + 8;
+  ctx.lineWidth = 1; ctx.font = `11px ${MONO}`;
+  for (const v of xs){
+    const x = ox + (v - cen[0]) / R * sc;
+    ctx.strokeStyle = hexA(C.ink, v === 0 && S.proj === 'pca' ? .22 : .06); ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + h); ctx.stroke();
+    ctx.strokeStyle = hexA(C.ink, .5); ctx.beginPath(); ctx.moveTo(x, Y0); ctx.lineTo(x, Y0 + 5); ctx.stroke();
+    ctx.fillStyle = C.muted; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(fmtTick(v), x, Y0 + 8);
+  }
+  for (const v of ys){
+    const y = oy - (v - cen[1]) / R * sc;
+    ctx.strokeStyle = hexA(C.ink, v === 0 && S.proj === 'pca' ? .22 : .06); ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + w, y); ctx.stroke();
+    ctx.strokeStyle = hexA(C.ink, .5); ctx.beginPath(); ctx.moveTo(X0 - 5, y); ctx.lineTo(X0, y); ctx.stroke();
+    ctx.fillStyle = C.muted; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(fmtTick(v), X0 - 8, y);
+  }
+  ctx.strokeStyle = hexA(C.ink, .55); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(X0, padT); ctx.lineTo(X0, Y0); ctx.lineTo(padL + w, Y0); ctx.stroke();
+  ctx.fillStyle = C.ink; ctx.font = `12px ${MONO}`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.fillText(names[0] + ' →', padL + w, CH - 4);
+  ctx.save(); ctx.translate(12, padT); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText(names[1] + ' →', 0, 0); ctx.restore();
+  if (S.proj === 'tsne'){ ctx.fillStyle = C.muted; ctx.font = `11px ${MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.fillText('t-SNE units have no meaning', padL, CH - 4); }
+}
+
+function drawAxes3D(cam){
+  const {cen, R, e} = fit, names = axisNames(), E = [Math.max(e[0], .05), Math.max(e[1], .05), Math.max(e[2], .05)];
+  const P = (x, y, z) => cam(x, y, z);
+  const seg = (a, b, col, lw) => { const p = P(...a), q = P(...b); ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); };
+  // floor grid (at the bottom of the vertical axis) and the bounding box
+  const fy = -E[1];
+  for (let t = 0; t <= 4; t++){
+    const u = -1 + t / 2;
+    seg([u * E[0], fy, -E[2]], [u * E[0], fy, E[2]], hexA(C.ink, .07), 1);
+    seg([-E[0], fy, u * E[2]], [E[0], fy, u * E[2]], hexA(C.ink, .07), 1);
+  }
+  const corners = []; for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) corners.push([sx, sy, sz]);
+  for (let a = 0; a < 8; a++) for (let b = a + 1; b < 8; b++){
+    const ca = corners[a], cb = corners[b], diff = ca.reduce((s, v, i) => s + (v !== cb[i]), 0);
+    if (diff === 1) seg(ca.map((v, i) => v * E[i]), cb.map((v, i) => v * E[i]), hexA(C.ink, .08), 1);
+  }
+  // three axes from the corner nearest the origin of the data box, with ticks in data units
+  const o = [-E[0], -E[1], -E[2]], cols = [C.blue, C.green, C.gold];
+  const center = P(0, 0, 0);
+  for (let c = 0; c < 3; c++){
+    const end = o.slice(); end[c] = E[c] * 1.12;
+    seg(o, end, hexA(cols[c], .9), 2);
+    const pe = P(...end), pb = P(...o.map((v, i) => i === c ? E[c] * 1.02 : v));
+    const ang = Math.atan2(pe[1] - pb[1], pe[0] - pb[0]);
+    ctx.fillStyle = cols[c]; ctx.beginPath(); ctx.moveTo(pe[0], pe[1]);
+    ctx.lineTo(pe[0] - 9 * Math.cos(ang - .4), pe[1] - 9 * Math.sin(ang - .4)); ctx.lineTo(pe[0] - 9 * Math.cos(ang + .4), pe[1] - 9 * Math.sin(ang + .4)); ctx.closePath(); ctx.fill();
+    const lx = pe[0] + 12 * Math.cos(ang), ly = pe[1] + 12 * Math.sin(ang);
+    ctx.font = `12px ${MONO}`; ctx.textAlign = Math.cos(ang) > .3 ? 'left' : Math.cos(ang) < -.3 ? 'right' : 'center'; ctx.textBaseline = 'middle';
+    ctx.strokeStyle = C.bg; ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(names[c], lx, ly); ctx.fillText(names[c], lx, ly);
+    const lo = cen[c] - E[c] * R, hi = cen[c] + E[c] * R;
+    ctx.font = `10px ${MONO}`; ctx.fillStyle = C.muted;
+    for (const v of niceTicks(lo, hi, 4)){
+      const q = o.slice(); q[c] = (v - cen[c]) / R; const p = P(...q);
+      const dx = p[0] - center[0], dy = p[1] - center[1], dn = Math.hypot(dx, dy) || 1;
+      ctx.strokeStyle = hexA(cols[c], .8); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] + dx / dn * 5, p[1] + dy / dn * 5); ctx.stroke();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(fmtTick(v), p[0] + dx / dn * 16, p[1] + dy / dn * 14);
+    }
+  }
+}
+
+function draw(f2, cam){
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, CW, CH);
+  const small = D.name === 'caltech', sizeScale = Math.max(.62, Math.min(1, CW / 760));
+  const IS = (small ? 28 : 46) * sizeScale * (cam ? .85 : 1);
+  if (f2) drawAxes2D(f2); else drawAxes3D(cam);
+  const sel = S.sel, hov = S.hover, selPair = D.items[sel]?.pair;
+  const vis = g => disp.a[g] > .01;
+  let zmin = Infinity, zmax = -Infinity;
+  if (cam) for (const g of idx){ zmin = Math.min(zmin, scr.z[g]); zmax = Math.max(zmax, scr.z[g]); }
+  const fog = g => cam ? .45 + .55 * ((scr.z[g] - zmin) / ((zmax - zmin) || 1)) : 1;
+  if (S.pairs){
+    for (const g of D.images){
+      const p = D.items[g].pair; if (p == null || !vis(g) || !vis(p)) continue;
+      const hl = g === sel || p === sel || g === hov || p === hov;
+      ctx.strokeStyle = hl ? hexA(C.yellow, .9) : hexA(C.ink, .13 * Math.min(disp.a[g], disp.a[p]) * fog(g));
+      ctx.lineWidth = hl ? 2 : 1;
+      ctx.beginPath(); ctx.moveTo(scr.x[g], scr.y[g]); ctx.lineTo(scr.x[p], scr.y[p]); ctx.stroke();
+    }
+  }
+  const at = D.atlas, cell = at.cell;
+  const drawImg = (g, s, stroke, lw, a) => {
+    const t = D.items[g].thumb, sx = (t % at.cols) * cell, sy = Math.floor(t / at.cols) * cell;
+    ctx.globalAlpha = a;
+    ctx.drawImage(D.img, sx, sy, cell, cell, scr.x[g] - s / 2, scr.y[g] - s / 2, s, s);
+    ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.strokeRect(scr.x[g] - s / 2, scr.y[g] - s / 2, s, s);
+    ctx.globalAlpha = 1;
+  };
+  const drawText = (g) => {
+    const r = (small ? 7 : 5.5) * sizeScale * scr.k[g] + (g === sel || g === hov ? 2 : 0), x = scr.x[g], y = scr.y[g];
+    ctx.globalAlpha = disp.a[g] * fog(g); ctx.fillStyle = C.gold; ctx.beginPath();
+    if (small){ ctx.moveTo(x, y - r * 1.3); ctx.lineTo(x + r * 1.3, y); ctx.lineTo(x, y + r * 1.3); ctx.lineTo(x - r * 1.3, y); ctx.closePath(); }
+    else ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    if (g === sel){ ctx.strokeStyle = C.yellow; ctx.lineWidth = 2.5; ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  };
+  // back-to-front so nearer points cover farther ones
+  const order = idx.filter(g => vis(g) && g !== sel && g !== hov).sort((a, b) => scr.z[a] - scr.z[b]);
+  for (const g of order){
+    if (D.items[g].kind === 'text') drawText(g);
+    else drawImg(g, IS * scr.k[g], hexA(C.blue, .85), 1.5, disp.a[g] * fog(g));
+  }
+  ctx.font = `italic ${Math.round(14 * Math.max(.85, sizeScale))}px ${SERIF}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.lineJoin = 'round';
+  const label = (g, s) => { if (!vis(g)) return; ctx.globalAlpha = disp.a[g] * Math.max(.7, fog(g)); ctx.strokeStyle = C.bg; ctx.lineWidth = 4; ctx.strokeText(s, scr.x[g] + 11, scr.y[g]); ctx.fillStyle = C.gold; ctx.fillText(s, scr.x[g] + 11, scr.y[g]); ctx.globalAlpha = 1; };
+  if (small) for (const g of D.texts) label(g, D.items[g].label);
+  for (const g of [hov, sel]){
+    if (g < 0 || !vis(g)) continue;
+    if (D.items[g].kind === 'image') drawImg(g, IS * 1.5 * Math.max(1, scr.k[g]), C.yellow, 3, disp.a[g]);
+    else drawText(g);
+  }
+  if (sel >= 0 && D.items[sel].kind === 'text' && !small) label(sel, D.items[sel].caption);
+  if (selPair != null && D.items[selPair]?.kind === 'text' && !small) label(selPair, D.items[selPair].caption);
+}
+
+/* ---------- interaction ---------- */
+function pick(x, y){
+  let best = -1, bz = -Infinity;
+  const IS = (D.name === 'caltech' ? 28 : 46) * Math.max(.62, Math.min(1, CW / 760)) * (S.dims === 3 ? .85 : 1);
+  for (const g of idx){
+    if (disp.a[g] < .5) continue;
+    const d = Math.hypot(scr.x[g] - x, scr.y[g] - y), lim = D.items[g].kind === 'image' ? IS * scr.k[g] * .62 : 12;
+    if (d < lim && scr.z[g] - d * 1e-3 > bz){ bz = scr.z[g] - d * 1e-3; best = g; }
+  }
+  return best;
+}
+const tip = $('tip');
+function local(e){ const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+function showTip(g, x, y){
+  if (g < 0){ tip.hidden = true; return; }
+  const it = D.items[g];
+  tip.innerHTML = `<small>${it.kind === 'image' ? 'image · ' + esc(it.label) : 'text'}</small>${esc(it.caption)}`;
+  tip.hidden = false;
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  tip.style.left = Math.max(4, Math.min(CW - tw - 8, x + 14)) + 'px';
+  tip.style.top = (y + th + 20 > CH ? y - th - 12 : y + 16) + 'px';
+}
+cv.addEventListener('pointerdown', e => {
+  if (!D) return;
+  const [x, y] = local(e);
+  dragging = {x, y, x0:x, y0:y, moved:0, id:e.pointerId};
+  if (S.dims === 3) cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener('pointermove', e => {
+  if (!D) return;
+  const [x, y] = local(e);
+  if (dragging && S.dims === 3){
+    const dx = x - dragging.x, dy = y - dragging.y;
+    dragging.moved += Math.abs(dx) + Math.abs(dy); dragging.x = x; dragging.y = y;
+    if (dragging.moved > 4){
+      S.yaw += dx * .008; S.pitch = Math.max(-1.45, Math.min(1.45, S.pitch + dy * .008));
+      if (S.spin){ S.spin = false; $('spin').checked = false; }
+      tip.hidden = true; cv.style.cursor = 'grabbing'; kick(); return;
+    }
+  }
+  const g = pick(x, y);
+  if (g !== S.hover){ S.hover = g; kick(); }
+  showTip(g, x, y);
+});
+cv.addEventListener('pointerup', e => {
+  if (!D || !dragging) return;
+  const [x, y] = local(e), moved = dragging.moved; dragging = null;
+  cv.style.cursor = S.dims === 3 ? 'grab' : 'crosshair';
+  if (moved <= 4){ const g = pick(x, y); if (g >= 0) select(g); }
+  kick();
+});
+cv.addEventListener('pointercancel', () => { dragging = null; });
+cv.addEventListener('pointerleave', () => { if (!dragging){ S.hover = -1; tip.hidden = true; kick(); } });
+cv.addEventListener('wheel', e => {
+  if (S.dims !== 3) return;
+  e.preventDefault();
+  S.zoom = Math.max(.5, Math.min(3.5, S.zoom * Math.exp(-e.deltaY * .0015))); kick();
+}, {passive:false});
+function select(g){ S.sel = g; renderPanel(); kick(); }
+
+function applyDims(){
+  const three = S.dims === 3;
+  $('view-ctl').hidden = !three; $('hint').hidden = !three;
+  cv.style.touchAction = three ? 'none' : 'auto';
+  cv.style.cursor = three ? 'grab' : 'crosshair';
+}
+document.querySelectorAll('input[name=ds]').forEach(r => r.addEventListener('change', () => setDataset(r.value)));
+document.querySelectorAll('input[name=proj]').forEach(r => r.addEventListener('change', () => { S.proj = r.value; $('tsne-ctl').hidden = S.proj !== 'tsne'; startProjection(); }));
+document.querySelectorAll('input[name=dims]').forEach(r => r.addEventListener('change', () => { S.dims = +r.value; applyDims(); startProjection(); }));
+document.querySelectorAll('input[name=show]').forEach(r => r.addEventListener('change', () => { S.show = r.value; buildSet(); startProjection(); }));
+$('pairs').addEventListener('change', e => { S.pairs = e.target.checked; kick(); });
+$('gap').addEventListener('change', e => { S.gap = e.target.checked; buildSet(); startProjection(); });
+$('spin').addEventListener('change', e => { S.spin = e.target.checked; kick(); });
+$('reset-view').addEventListener('click', () => { Object.assign(S, CAM0); kick(); });
+$('perp').addEventListener('input', e => { $('perp-out').textContent = e.target.value; });
+$('perp').addEventListener('change', e => { S.perp = +e.target.value; if (S.proj === 'tsne') startProjection(); });
+$('rerun').addEventListener('click', () => { S.seed++; startProjection(); });
+
+/* ---------- text panels ---------- */
+function updateStatus(){
+  const st = $('status'), m = idx.length, d = S.dims, ov = overlap == null ? '…' : Math.round(overlap * 100) + '%';
+  const kept = pca.ratio.slice(0, d).reduce((a, b) => a + b, 0) * 100;
+  if (S.proj === 'pca') st.innerHTML = `<b>PCA ${d}-D</b> · ${m} points · ${d} axes keep <b>${kept.toFixed(1)}%</b> of the variance · 5-NN kept ${ov}`;
+  else st.innerHTML = `<b>t-SNE ${d}-D</b> · iteration ${tsne.iter} / ${TSNE_ITERS}${tsne.iter < 250 ? ' (early exaggeration)' : ''} · KL ${isNaN(tsne.kl) ? '…' : tsne.kl.toFixed(3)} · perplexity ${S.perp} · ${S.seed ? 'random start #' + S.seed : 'PCA start'} · 5-NN kept ${ov}`;
+  $('pca-note').textContent = `Right now ${d} PCA axes hold ${kept.toFixed(1)}% of the variance of the points shown; the other ${(100 - kept).toFixed(1)}% is invisible in the plot.`;
+}
+function thumbStyle(g, px){
+  const it = D.items[g], at = D.atlas, rows = Math.ceil(D.images.length / at.cols);
+  return `background-image:url(${at.file});background-size:${at.cols * px}px ${rows * px}px;background-position:-${(it.thumb % at.cols) * px}px -${Math.floor(it.thumb / at.cols) * px}px`;
+}
+function renderPanel(){
+  if (!D) return;
+  const g = S.sel, it = D.items[g], isImg = it.kind === 'image';
+  let nearPlot = new Set();
+  const li = idx.indexOf(g);
+  if (li >= 0 && layout && (S.proj === 'pca' || (tsne && tsne.done))) nearPlot = new Set([...knnLow(layout, idx.length, S.dims, 8, li)[0]].map(j => idx[j]));
+  const pool = isImg ? D.texts : D.images;
+  const ranked = pool.map(j => [D.cos(g, j), j]).sort((a, b) => b[0] - a[0]).slice(0, 5);
+  const maxv = Math.max(.4, ranked[0][0]);
+  const credit = it.credit ? `<p class="credit">Photo: ${esc(it.credit.author)} · ${esc(it.credit.license)} · <a href="${esc(it.credit.url)}" target="_blank" rel="noopener">source</a></p>` : '';
+  const head = isImg
+    ? `<div class="sel-head"><div class="thumb" style="${thumbStyle(g, 96)}" role="img" aria-label="${esc(it.caption)}"></div><div><div class="kind image">image · ${esc(it.label)}</div><p class="sel-cap">${esc(D.name === 'photos' ? it.caption : it.label)}</p>${D.name === 'caltech' ? `<p class="credit">${esc(it.caption)}</p>` : credit}</div></div>`
+    : `<div class="sel-head textonly"><div><div class="kind text">text</div><p class="sel-cap quote">“${esc(it.caption)}”</p></div></div>`;
+  const rows = ranked.map(([c, j]) => {
+    const jt = D.items[j], own = it.pair === j || jt.pair === g || (D.name === 'caltech' && jt.label === it.label);
+    const icon = jt.kind === 'image' ? `<span class="mini" style="${thumbStyle(j, 28)}"></span>` : '<span class="dot"></span>';
+    const name = jt.kind === 'image' ? (D.name === 'photos' ? jt.caption : jt.label) : jt.caption;
+    return `<li><button type="button" data-g="${j}">${icon}<span class="txt">${esc(name)}${own ? '<em>✓ match</em>' : ''}</span><span class="val">${c.toFixed(3)}<span class="bar"><b style="width:${Math.max(0, c / maxv * 100)}%"></b></span>${nearPlot.has(j) ? '<span class="near">near in plot</span>' : ''}</span></button></li>`;
+  }).join('');
+  const hitTxt = D.name === 'photos'
+    ? `<div class="stat"><div class="n">${D.hit} / ${D.images.length}</div><div class="d">photos whose best caption, by cosine, is their own</div></div>`
+    : `<div class="stat"><div class="n">${D.hit} / ${D.images.length}</div><div class="d">images classified correctly from the 12 prompts (zero-shot)</div></div>`;
+  const ov = overlap == null ? '…' : Math.round(overlap * 100) + '%';
+  $('panel').innerHTML = `${head}
+    <div><h3>${isImg ? 'Closest captions' : 'Closest images'} in CLIP’s 512-d space</h3><p class="sub">Cosine similarity of the raw embeddings, the score CLIP uses. “Near in plot” marks items also among this point’s 8 nearest neighbours in the current ${S.dims}-D view.</p></div>
+    <ul class="nn">${rows}</ul>
+    <div class="stats">${hitTxt}<div class="stat"><div class="n">${ov}</div><div class="d">of each point’s 5 nearest neighbours in 512-d are still among its 5 nearest in this ${S.dims}-D view</div></div></div>`;
+  $('panel').querySelectorAll('[data-g]').forEach(b => b.addEventListener('click', () => select(+b.dataset.g)));
+}
+function renderCredits(){
+  const el = $('credits');
+  if (D.name === 'photos') el.innerHTML = D.images.map(g => { const c = D.items[g].credit; return `<div>${esc(c.title)} — ${esc(c.author)} · ${esc(c.license)} · <a href="${esc(c.url)}" target="_blank" rel="noopener">source</a></div>`; }).join('') + '<div>Thumbnails are centre-cropped and resized; photographs are otherwise unedited. Captions are written for this page.</div>';
+  else el.innerHTML = `<div>Caltech-101 — ${esc(D.credit.author)} · ${esc(D.credit.license)} · <a href="${esc(D.credit.url)}" target="_blank" rel="noopener">source</a>. First 12 images of each of the 12 classes shown.</div>`;
+}
+
+applyDims();
+setDataset('photos');
+})();
+</script>
+</body>
+</html>

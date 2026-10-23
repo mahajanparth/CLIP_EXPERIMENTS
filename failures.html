@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CLIP's Blind Spots</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: verdict scoreboard → evidence gallery (tabs per test) → why (text-similarity strip plot) → live tester (image | captions + results). Same dark 3Blue1Brown palette as the walkthrough. */
+:root{
+  --bg:#0e1116; --surface:#161b24; --ink:#ece6da; --muted:#8d95a2; --line:#283142;
+  --blue:#58c4dd; --gold:#d99a4e; --yellow:#f4e07a; --green:#83c167; --red:#fc6255;
+  --serif:"STIX Two Text","STIX Two","Cambria Math",Georgia,serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--bg);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.55}
+img{max-width:100%}
+[hidden]{display:none!important}
+a{color:var(--blue)}
+:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:28px 72px;display:grid;gap:44px}
+nav{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:13px}
+nav a{color:var(--muted);text-decoration:none}
+nav a:hover{color:var(--blue)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:16px 0 0}
+h1{font-size:clamp(2rem,4.6vw,3rem);font-weight:400;line-height:1.1;margin:.2em 0 .25em;text-wrap:balance}
+h1 em{color:var(--red)}
+h2{font-size:1.6rem;font-weight:400;margin:0 0 6px;text-wrap:balance}
+h2 .k{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px}
+.lede{color:var(--muted);max-width:68ch;margin:0}
+.intro{max-width:70ch;margin:0 0 18px;color:var(--muted)}
+section{min-width:0}
+/* scoreboard */
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{border:1px solid var(--line);border-radius:8px;padding:18px;background:var(--surface);display:grid;gap:10px;align-content:start}
+.card h3{margin:0;font-size:1.15rem;font-weight:400}
+.card .ex{font-style:italic;color:var(--muted);font-size:.95rem;margin:0}
+.big{font-family:var(--mono);font-size:2.2rem;line-height:1;font-variant-numeric:tabular-nums}
+.big small{font-size:.9rem;color:var(--muted);margin-left:6px}
+.strip{display:flex;flex-wrap:wrap;gap:3px}
+.strip i{width:12px;height:12px;border-radius:2px;display:block}
+.strip i.ok{background:var(--green)} .strip i.no{background:var(--red)}
+.strip .pr{display:flex;gap:1px;margin-right:4px}
+.card .foot{font-size:.92rem;color:var(--ink);margin:0}
+.card .foot b{font-family:var(--mono);font-weight:500}
+.verdict{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.verdict.bad{color:var(--red)} .verdict.meh{color:var(--yellow)}
+/* tabs */
+.tabs{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:max-content;max-width:100%;flex-wrap:wrap;margin-bottom:16px}
+.tabs button{font-family:var(--mono);font-size:13px;padding:8px 14px;border:0;border-right:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
+.tabs button:last-child{border-right:0}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:inset 0 -2px 0 var(--blue)}
+.pairs{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.pair{border:1px solid var(--line);border-radius:8px;padding:12px;display:grid;gap:10px;background:var(--bg)}
+.caps{display:grid;gap:2px;font-size:.88rem;line-height:1.35}
+.caps span b{font-family:var(--mono);font-weight:500;color:var(--blue);margin-right:6px}
+.caps span:nth-child(2) b{color:var(--gold)}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.shot{display:grid;gap:6px;min-width:0}
+.thumb{width:100%;aspect-ratio:1;border-radius:4px;background-repeat:no-repeat;border:1px solid var(--line);cursor:pointer;padding:0}
+.thumb:hover{border-color:var(--blue)}
+.mbar{display:grid;grid-template-columns:14px minmax(0,1fr) 46px;gap:5px;align-items:center;font-family:var(--mono);font-size:11px;font-variant-numeric:tabular-nums}
+.mbar .t{height:7px;background:var(--line);border-radius:2px;overflow:hidden}
+.mbar .t b{display:block;height:100%}
+.mbar.A .t b{background:var(--blue)} .mbar.B .t b{background:var(--gold)}
+.mbar .l{color:var(--muted)}
+.mbar .v{text-align:right}
+.mbar.right .v{color:var(--green)}
+.tag{font-family:var(--mono);font-size:11px}
+.tag.ok{color:var(--green)} .tag.no{color:var(--red)}
+.count-wrap{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:760px){.count-wrap{grid-template-columns:minmax(0,1fr)}}
+.conf{border-collapse:collapse;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+.conf th{font-weight:400;color:var(--muted);padding:6px 8px;font-size:12px}
+.conf td{width:44px;height:40px;text-align:center;border:1px solid var(--bg)}
+.conf td.diag{outline:2px solid var(--green);outline-offset:-2px}
+.conf caption{caption-side:bottom;text-align:left;color:var(--muted);font-size:12px;padding-top:8px;font-family:var(--serif)}
+.apples{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+.apples .shot .tag{text-align:center}
+/* why */
+.why{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:28px;align-items:start}
+@media (max-width:860px){.why{grid-template-columns:minmax(0,1fr)}}
+.chart{overflow-x:auto}
+.chart svg{display:block;width:100%;height:auto;min-width:460px}
+.why p{margin:0 0 10px;max-width:62ch}
+.why p.m{color:var(--muted);font-size:.95rem}
+/* tester */
+.tester{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:860px){.tester{grid-template-columns:minmax(0,1fr)}}
+.panel{border:1px solid var(--line);border-radius:8px;padding:16px;background:var(--surface);display:grid;gap:12px;min-width:0}
+.lab{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.drop{position:relative;border:1.5px dashed var(--line);border-radius:8px;aspect-ratio:1;display:grid;place-items:center;overflow:hidden;background:var(--bg)}
+.drop.over{border-color:var(--blue)}
+.drop img,.drop .bg{width:100%;height:100%;object-fit:cover;background-repeat:no-repeat}
+.drop .empty{color:var(--muted);text-align:center;padding:20px;font-size:.95rem}
+.drop .src{position:absolute;left:8px;bottom:8px;right:8px;font-family:var(--mono);font-size:11px;color:var(--ink);background:rgba(14,17,22,.78);padding:4px 7px;border-radius:4px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button.plain,label.plain{font-family:var(--mono);font-size:13px;padding:8px 13px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+button.plain:hover,label.plain:hover{border-color:var(--blue)}
+label.plain input{position:absolute;width:1px;height:1px;opacity:0}
+label.plain:focus-within{outline:2px solid var(--yellow);outline-offset:2px}
+button.go{font-family:var(--mono);font-size:14px;font-weight:500;padding:10px 18px;border-radius:999px;border:0;background:var(--blue);color:var(--bg);cursor:pointer}
+button.go:disabled{opacity:.5;cursor:progress}
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+.presets button{font-family:var(--mono);font-size:12px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
+.presets button:hover{color:var(--ink);border-color:var(--gold)}
+textarea{width:100%;min-height:150px;resize:vertical;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:var(--serif);font-size:1rem;line-height:1.5}
+textarea:focus{border-color:var(--blue);outline:none}
+.small{font-size:.88rem;color:var(--muted);margin:0}
+.models{display:grid;gap:8px}
+.model{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;font-family:var(--mono);font-size:12px}
+.model .name{color:var(--ink)}
+.model .st{color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.model .st.ok{color:var(--green)}
+.prog{grid-column:1/-1;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.prog b{display:block;height:100%;width:0;background:var(--blue);transition:width .2s}
+.results{display:grid;gap:10px}
+.res{display:grid;grid-template-columns:minmax(0,1fr) 150px 70px;gap:4px 14px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.res.win{border-color:var(--green)}
+.res .cap{font-size:1rem;line-height:1.35;min-width:0;overflow-wrap:anywhere}
+.res .toks{grid-column:1/-1;font-family:var(--mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.res .bar{height:8px;background:var(--line);border-radius:2px;overflow:hidden}
+.res .bar b{display:block;height:100%;background:var(--gold)}
+.res.win .bar b{background:var(--green)}
+.res .num{font-family:var(--mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums;line-height:1.3}
+.res .num small{display:block;color:var(--muted);font-size:11px}
+@media (max-width:520px){.res{grid-template-columns:minmax(0,1fr) 70px}.res .bar{grid-column:1/-1;grid-row:3}}
+.note{font-size:.92rem;color:var(--muted);margin:0;max-width:70ch}
+.note b{color:var(--ink);font-family:var(--mono);font-weight:500}
+.err{color:var(--red);font-family:var(--mono);font-size:12px;margin:0}
+.refs{color:var(--muted);font-size:.9rem;border-top:1px solid var(--line);padding-top:16px;display:grid;gap:6px}
+.refs p{margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <nav><a href="index.html">← How CLIP Works</a><a href="demo.html">Embedding Explorer</a><a href="prompts.html">Words Change the Experiment</a><a href="zeroshot.html">Zero-shot classifier</a></nav>
+    <p class="eyebrow">Controlled probes · OpenAI CLIP ViT-B/32</p>
+    <h1>CLIP’s <em>Blind Spots</em></h1>
+    <p class="lede">CLIP is good at telling you <i>what</i> is in a picture. It is much worse at <i>how many</i>, <i>where</i>, and <i>which colour goes with which object</i>. These 90 drawings each come with a correct caption and a word-swapped wrong one, and CLIP has to pick. At the bottom you can run CLIP on your own images and captions, right in this browser.</p>
+  </header>
+
+  <section aria-labelledby="h-score">
+    <h2 id="h-score"><span class="k">The verdict</span>Three simple tests, three failures</h2>
+    <p class="intro">Each square is one drawing: green when CLIP scores the correct caption higher, red when it prefers the swapped one. Spatial and colour drawings come in mirrored pairs, grouped together.</p>
+    <div class="board" id="board"></div>
+  </section>
+
+  <section aria-labelledby="h-ev">
+    <h2 id="h-ev"><span class="k">The evidence</span>Every drawing, every score</h2>
+    <p class="intro">Numbers are cosine similarities between the image and each caption. Click any drawing to load it into the tester below.</p>
+    <div class="tabs" role="tablist" id="tabs">
+      <button role="tab" aria-selected="true" data-tab="Spatial relationships" type="button">Left or right</button>
+      <button role="tab" aria-selected="false" data-tab="Attribute binding" type="button">Which colour is which</button>
+      <button role="tab" aria-selected="false" data-tab="Counting" type="button">How many</button>
+    </div>
+    <div id="evidence"></div>
+  </section>
+
+  <section aria-labelledby="h-why">
+    <h2 id="h-why"><span class="k">Why it happens</span>The text encoder barely hears the difference</h2>
+    <div class="why">
+      <div class="chart" id="why-chart"></div>
+      <div>
+        <p>Before the image is even involved, CLIP’s text encoder maps the correct caption and its swapped twin to almost the same vector. “A red cube to the left of a blue sphere” and “…to the right of…” have an average cosine of <b id="why-sp">0.995</b>. Same words, same embedding.</p>
+        <p>Contrastive training only teaches CLIP to tell a caption apart from the <i>other captions in the batch</i>. Web captions in a batch almost never differ only in word order or a left/right swap, so nothing pushes the model to encode it. It learns something close to a bag of words.</p>
+        <p class="m">Counting is partly learned (number words do appear in captions), but CLIP drifts toward “two”. Benchmarks built on this idea include Winoground (Thrush et al., CVPR 2022) and ARO (Yuksekgonul et al., ICLR 2023).</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-try" id="try">
+    <h2 id="h-try"><span class="k">Test it yourself</span>Your image, your captions</h2>
+    <p class="intro">Upload a photo or pick one of the drawings, write a few captions (one per line), and run CLIP. The model runs on this device in a background thread; your image is not uploaded anywhere.</p>
+    <div class="tester">
+      <div class="panel">
+        <div class="lab">Image</div>
+        <div class="drop" id="drop"><div class="empty">Drop an image here</div></div>
+        <div class="row">
+          <label class="plain" for="file">Upload image<input type="file" id="file" accept="image/*"></label>
+          <button class="plain" type="button" id="prev-img">◀ Drawing</button>
+          <button class="plain" type="button" id="next-img">Drawing ▶</button>
+        </div>
+        <p class="small">You can also paste an image. Built-in drawings and photos use precomputed image embeddings; your own image needs the image encoder.</p>
+        <div class="lab">CLIP in this browser</div>
+        <div class="models">
+          <div class="model"><span class="name">Text encoder · 64 MB</span><span class="st" id="st-text">not loaded</span><div class="prog"><b id="pg-text"></b></div></div>
+          <div class="model"><span class="name">Image encoder · 89 MB</span><span class="st" id="st-vision">not loaded</span><div class="prog"><b id="pg-vision"></b></div></div>
+        </div>
+        <p class="small">Weights are ViT-B/32 stored as 8-bit integers. Against full precision, embeddings agree to cosine ≥ 0.998 and 89 of 90 probe verdicts match. Downloads once, then stays cached where the browser allows.</p>
+      </div>
+      <div class="panel">
+        <div class="lab">Try a preset</div>
+        <div class="presets" id="presets"></div>
+        <label class="lab" for="caps">Captions, one per line (up to 8)</label>
+        <textarea id="caps" spellcheck="false"></textarea>
+        <div class="row">
+          <button class="go" id="run" type="button">Run CLIP</button>
+          <button class="plain" id="swap" type="button">Add swapped versions of line 1</button>
+        </div>
+        <p class="err" id="err" hidden></p>
+        <div class="results" id="results" aria-live="polite"></div>
+        <p class="note" id="res-note"></p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="refs">
+    <p>Probe drawings: original CC0 artwork generated by <code>scripts/generate_assets.py</code> in this project (seed 2021). Photos: Wikimedia Commons and scikit-image, credited on the <a href="demo.html">Embedding Explorer</a>. Gallery numbers use the full-precision model; the live tester uses the 8-bit copy.</p>
+    <p>Thrush et al., “Winoground: Probing Vision and Language Models for Visio-Linguistic Compositionality”, CVPR 2022. Yuksekgonul et al., “When and why vision-language models behave like bags-of-words, and what to do about it?”, ICLR 2023.</p>
+  </footer>
+</main>
+
+<script id="engine-src" type="text/plain">
+// Pure-JS CLIP ViT-B/32 inference with int8 per-row weights. No dependencies; runs in a Web Worker or Node.
+function createClipEngine(){
+  const models = {};
+
+  function loadModel(kind, header, buffer){
+    const T = {};
+    for (const [name, t] of Object.entries(header.tensors)){
+      const n = t.shape.reduce((a, b) => a * b, 1);
+      if (t.dtype === 'i8') T[name] = {q:new Int8Array(buffer, t.offset, n), s:new Float32Array(buffer, t.scales, t.shape[0]), shape:t.shape};
+      else T[name] = {f:new Float32Array(buffer, t.offset, n), shape:t.shape};
+    }
+    models[kind] = T;
+  }
+
+  // y[n×out] = x[n×in] · Wᵀ (+ b), W int8 with one scale per output row
+  function linear(T, x, n, name, bias){
+    const W = T[name], out = W.shape[0], inD = W.shape[1], q = W.q, s = W.s, b = bias ? T[bias].f : null;
+    const y = new Float32Array(n * out);
+    for (let o = 0; o < out; o++){
+      const wo = o * inD, so = s[o], bo = b ? b[o] : 0;
+      let t = 0;
+      for (; t + 3 < n; t += 4){
+        const x0 = t * inD, x1 = x0 + inD, x2 = x1 + inD, x3 = x2 + inD;
+        let a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+        for (let k = 0; k < inD; k++){ const w = q[wo + k]; a0 += x[x0 + k] * w; a1 += x[x1 + k] * w; a2 += x[x2 + k] * w; a3 += x[x3 + k] * w; }
+        y[t * out + o] = a0 * so + bo; y[(t + 1) * out + o] = a1 * so + bo; y[(t + 2) * out + o] = a2 * so + bo; y[(t + 3) * out + o] = a3 * so + bo;
+      }
+      for (; t < n; t++){ const xo = t * inD; let a = 0; for (let k = 0; k < inD; k++) a += x[xo + k] * q[wo + k]; y[t * out + o] = a * so + bo; }
+    }
+    return y;
+  }
+
+  function layerNorm(T, x, n, d, name){
+    const g = T[name + '.weight'].f, b = T[name + '.bias'].f, y = new Float32Array(n * d);
+    for (let t = 0; t < n; t++){
+      const o = t * d; let mu = 0; for (let k = 0; k < d; k++) mu += x[o + k]; mu /= d;
+      let v = 0; for (let k = 0; k < d; k++){ const z = x[o + k] - mu; v += z * z; } v /= d;
+      const r = 1 / Math.sqrt(v + 1e-5);
+      for (let k = 0; k < d; k++) y[o + k] = (x[o + k] - mu) * r * g[k] + b[k];
+    }
+    return y;
+  }
+
+  function attention(T, x, n, d, heads, p, causal){
+    const qkv = linear(T, x, n, p + 'in_proj_weight', p + 'in_proj_bias'), hd = d / heads, sc = 1 / Math.sqrt(hd);
+    const out = new Float32Array(n * d), w = new Float32Array(n);
+    for (let h = 0; h < heads; h++){
+      for (let i = 0; i < n; i++){
+        const qi = i * 3 * d + h * hd, lim = causal ? i + 1 : n;
+        let mx = -Infinity;
+        for (let j = 0; j < lim; j++){ const kj = j * 3 * d + d + h * hd; let s = 0; for (let k = 0; k < hd; k++) s += qkv[qi + k] * qkv[kj + k]; s *= sc; w[j] = s; if (s > mx) mx = s; }
+        let sum = 0; for (let j = 0; j < lim; j++){ w[j] = Math.exp(w[j] - mx); sum += w[j]; }
+        const oi = i * d + h * hd;
+        for (let j = 0; j < lim; j++){ const a = w[j] / sum, vj = j * 3 * d + 2 * d + h * hd; for (let k = 0; k < hd; k++) out[oi + k] += a * qkv[vj + k]; }
+      }
+    }
+    return linear(T, out, n, p + 'out_proj.weight', p + 'out_proj.bias');
+  }
+
+  function transformer(T, x, n, d, heads, prefix, layers, causal, progress){
+    for (let l = 0; l < layers; l++){
+      const p = `${prefix}resblocks.${l}.`;
+      const a = attention(T, layerNorm(T, x, n, d, p + 'ln_1'), n, d, heads, p + 'attn.', causal);
+      for (let i = 0; i < x.length; i++) x[i] += a[i];
+      const h = linear(T, layerNorm(T, x, n, d, p + 'ln_2'), n, p + 'mlp.c_fc.weight', p + 'mlp.c_fc.bias');
+      for (let i = 0; i < h.length; i++){ const v = h[i]; h[i] = v / (1 + Math.exp(-1.702 * v)); }   // QuickGELU
+      const m = linear(T, h, n, p + 'mlp.c_proj.weight', p + 'mlp.c_proj.bias');
+      for (let i = 0; i < x.length; i++) x[i] += m[i];
+      if (progress) progress((l + 1) / layers);
+    }
+    return x;
+  }
+
+  function normalize(v){ let s = 0; for (const x of v) s += x * x; s = Math.sqrt(s); return Array.from(v, x => x / s); }
+
+  // pixels: Float32Array 3×224×224 (CHW), already normalized with CLIP's mean/std
+  function encodeImage(pixels, progress){
+    const T = models.vision, d = 768, g = 7, P = 32, n = g * g + 1;
+    const patches = new Float32Array(g * g * 3 * P * P);
+    for (let py = 0; py < g; py++) for (let px = 0; px < g; px++){
+      const o = (py * g + px) * 3 * P * P;
+      for (let c = 0; c < 3; c++) for (let ky = 0; ky < P; ky++) for (let kx = 0; kx < P; kx++)
+        patches[o + c * P * P + ky * P + kx] = pixels[c * 224 * 224 + (py * P + ky) * 224 + px * P + kx];
+    }
+    const emb = linear(T, patches, g * g, 'visual.conv1.weight', null);
+    const x = new Float32Array(n * d), cls = T['visual.class_embedding'].f, pos = T['visual.positional_embedding'].f;
+    for (let k = 0; k < d; k++) x[k] = cls[k] + pos[k];
+    for (let t = 1; t < n; t++) for (let k = 0; k < d; k++) x[t * d + k] = emb[(t - 1) * d + k] + pos[t * d + k];
+    let h = layerNorm(T, x, n, d, 'visual.ln_pre');
+    h = transformer(T, h, n, d, 12, 'visual.transformer.', 12, false, progress);
+    const c = layerNorm(T, h.subarray(0, d), 1, d, 'visual.ln_post');
+    return normalize(linear(T, c, 1, 'visual.proj', null));
+  }
+
+  // ids: [SOT, ..., EOT]; with a causal mask, tokens after EOT cannot change it, so we only run up to EOT
+  function encodeText(ids){
+    const T = models.text, d = 512, n = ids.length, E = T['token_embedding.weight'], pos = T['positional_embedding'].f;
+    const x = new Float32Array(n * d);
+    for (let t = 0; t < n; t++){ const r = ids[t] * d, s = E.s[ids[t]]; for (let k = 0; k < d; k++) x[t * d + k] = E.q[r + k] * s + pos[t * d + k]; }
+    const h = transformer(T, x, n, d, 8, 'transformer.', 12, true, null);
+    const last = layerNorm(T, h.subarray((n - 1) * d, n * d), 1, d, 'ln_final');
+    return normalize(linear(T, last, 1, 'text_projection', null));
+  }
+
+  return {loadModel, encodeImage, encodeText, has:k => !!models[k]};
+}
+
+// CLIP's byte-level BPE tokenizer (port of clip/simple_tokenizer.py, without ftfy)
+function createTokenizer(mergesText){
+  const bs = [];
+  for (let i = 33; i <= 126; i++) bs.push(i); for (let i = 161; i <= 172; i++) bs.push(i); for (let i = 174; i <= 255; i++) bs.push(i);
+  const cs = bs.slice(); let n = 0;
+  for (let b = 0; b < 256; b++) if (!bs.includes(b)){ bs.push(b); cs.push(256 + n); n++; }
+  const byteEnc = {}; bs.forEach((b, i) => byteEnc[b] = String.fromCharCode(cs[i]));
+  const merges = mergesText.split('\n').filter(Boolean).map(l => l.split(' '));
+  const vocab = bs.map(b => byteEnc[b]); const base = vocab.slice();   // insertion order, as in Python's dict
+  for (const v of base) vocab.push(v + '</w>');
+  for (const m of merges) vocab.push(m.join(''));
+  vocab.push('<|startoftext|>', '<|endoftext|>');
+  const enc = new Map(vocab.map((v, i) => [v, i]));
+  const ranks = new Map(merges.map((m, i) => [m[0] + ' ' + m[1], i]));
+  const cache = new Map();
+  const pat = /<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+/giu;
+  const utf8 = new TextEncoder();
+  function bpe(token){
+    if (cache.has(token)) return cache.get(token);
+    let word = Array.from(token); word[word.length - 1] += '</w>';
+    while (word.length > 1){
+      let best = null, br = Infinity;
+      for (let i = 0; i < word.length - 1; i++){ const r = ranks.get(word[i] + ' ' + word[i + 1]); if (r !== undefined && r < br){ br = r; best = i; } }
+      if (best === null) break;
+      const a = word[best], b = word[best + 1], nw = [];
+      for (let i = 0; i < word.length;){
+        if (i < word.length - 1 && word[i] === a && word[i + 1] === b){ nw.push(a + b); i += 2; } else { nw.push(word[i]); i++; }
+      }
+      word = nw;
+    }
+    cache.set(token, word); return word;
+  }
+  function encode(text){
+    const clean = text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim().toLowerCase();
+    const ids = [];
+    for (const m of clean.matchAll(pat)){
+      const tok = Array.from(utf8.encode(m[0]), b => byteEnc[b]).join('');
+      for (const piece of bpe(tok)) ids.push(enc.get(piece));
+    }
+    return [49406, ...ids.slice(0, 75), 49407];
+  }
+  return {encode, decode:ids => ids.map(i => vocab[i]).join('').replace(/<\/w>/g, ' ')};
+}
+
+
+</script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = v => (v < 0 ? '−' : '') + Math.abs(v).toFixed(3);
+const EXPS = ['Counting', 'Spatial relationships', 'Attribute binding'];
+let P = null, PV = null, PH = null;
+
+function unpack(b64){ const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); const i16 = new Int16Array(u8.buffer); return Float32Array.from(i16, v => v / 32767); }
+function bg(atlas, n, k){
+  const rows = Math.ceil(n / atlas.cols);
+  return `background-image:url(${atlas.file});background-size:${atlas.cols * 100}% ${rows * 100}%;background-position:${(k % atlas.cols) / (atlas.cols - 1) * 100}% ${Math.floor(k / atlas.cols) / Math.max(1, rows - 1) * 100}%`;
+}
+const byExp = e => P.items.filter(it => it.exp === e);
+function pairsOf(e){ const m = new Map(); for (const it of byExp(e)){ if (!m.has(it.pair)) m.set(it.pair, []); m.get(it.pair).push(it); } return [...m.values()]; }
+
+/* ---------- scoreboard ---------- */
+function renderBoard(){
+  const card = (title, ex, items, grouped, foot, verdict, cls) => {
+    const win = items.filter(it => it.sc > it.si).length;
+    const strip = grouped
+      ? pairsOf(items[0].exp).map(pr => `<span class="pr">${pr.map(it => `<i class="${it.sc > it.si ? 'ok' : 'no'}" title="${esc(it.correct)}"></i>`).join('')}</span>`).join('')
+      : items.map(it => `<i class="${it.sc > it.si ? 'ok' : 'no'}" title="${esc(it.correct)}"></i>`).join('');
+    return `<div class="card"><span class="verdict ${cls}">${verdict}</span><h3>${title}</h3><p class="ex">${esc(ex)}</p>
+      <div class="big">${win} / ${items.length}<small>chance: ${items.length / 2}</small></div><div class="strip">${strip}</div><p class="foot">${foot}</p></div>`;
+  };
+  const sp = byExp('Spatial relationships'), bd = byExp('Attribute binding'), ct = byExp('Counting');
+  const both = e => pairsOf(e).filter(pr => pr.every(it => it.sc > it.si)).length;
+  const cHit = ct.filter(it => it.counts.indexOf(Math.max(...it.counts)) + 1 === it.count).length;
+  const saysTwo = ct.filter(it => it.counts.indexOf(Math.max(...it.counts)) === 1).length;
+  $('board').innerHTML =
+    card('Left or right', `“${sp[0].correct}” vs “${sp[0].incorrect}”`, sp, true,
+      `Mirrored pairs with both pictures right: <b>${both('Spatial relationships')} / ${pairsOf('Spatial relationships').length}</b>. Every pair gets one right and one wrong, so CLIP prefers the same caption whichever way round the shapes are.`, 'no better than a coin', 'bad') +
+    card('Which colour is which', `“${bd[0].correct}” vs “${bd[0].incorrect}”`, bd, true,
+      `Pairs with both right: <b>${both('Attribute binding')} / ${pairsOf('Attribute binding').length}</b>. CLIP knows red and blue are present, but not which object is which colour.`, 'no better than a coin', 'bad') +
+    card('How many apples', `“${ct[0].correct}” vs “${ct[0].incorrect}”`, ct, false,
+      `Against one wrong count it does better than chance. Asked to choose from one to six apples, it picks the right number <b>${cHit} / ${ct.length}</b> times and says “two” for <b>${saysTwo}</b> of the ${ct.length} drawings.`, 'partly works', 'meh');
+}
+
+/* ---------- evidence ---------- */
+function mbar(letter, v, lo, hi, right){
+  const w = Math.max(2, (v - lo) / (hi - lo) * 100);
+  return `<div class="mbar ${letter}${right ? ' right' : ''}"><span class="l">${letter}</span><span class="t"><b style="width:${w}%"></b></span><span class="v">${v.toFixed(3)}${right ? ' ✓' : ''}</span></div>`;
+}
+function renderEvidence(tab){
+  const el = $('evidence');
+  if (tab === 'Counting'){
+    const ct = byExp('Counting');
+    const conf = {}; for (const it of ct){ const p = it.counts.indexOf(Math.max(...it.counts)) + 1; conf[it.count + ',' + p] = (conf[it.count + ',' + p] || 0) + 1; }
+    const max = Math.max(...Object.values(conf));
+    let tbl = `<table class="conf"><thead><tr><th></th>${[1,2,3,4,5,6].map(c => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>`;
+    for (const tr of [2, 3, 4]){
+      tbl += `<tr><th scope="row">${tr} apples</th>`;
+      for (let c = 1; c <= 6; c++){ const v = conf[tr + ',' + c] || 0; tbl += `<td class="${c === tr ? 'diag' : ''}" style="background:${v ? `rgba(88,196,221,${.15 + .75 * v / max})` : 'transparent'}">${v || ''}</td>`; }
+      tbl += '</tr>';
+    }
+    tbl += `</tbody><caption>Rows: true number of apples. Columns: the count CLIP picks from “${esc(P.count_prompts[0])}” … “${esc(P.count_prompts[5])}”. Outlined cells are correct.</caption></table>`;
+    const tiles = ct.map(it => {
+      const p = it.counts.indexOf(Math.max(...it.counts)) + 1, ok = p === it.count;
+      return `<div class="shot"><button class="thumb" type="button" data-k="${it.thumb}" style="${bg(P.atlas, P.items.length, it.thumb)}" aria-label="Test ${esc(it.correct)}"></button><span class="tag ${ok ? 'ok' : 'no'}">${it.count} → says ${p}</span></div>`;
+    }).join('');
+    el.innerHTML = `<div class="count-wrap"><div>${tbl}</div><div class="apples">${tiles}</div></div>`;
+  } else {
+    const prs = pairsOf(tab);
+    el.innerHTML = `<div class="pairs">${prs.map(pr => {
+      const A = pr[0].correct, B = pr[0].incorrect;
+      const all = pr.flatMap(it => [it.sc, it.si]), lo = Math.min(...all) - .01, hi = Math.max(...all);
+      return `<div class="pair"><div class="caps"><span><b>A</b>${esc(A)}</span><span><b>B</b>${esc(B)}</span></div><div class="duo">${pr.map(it => {
+        const sA = it.correct === A ? it.sc : it.si, sB = it.correct === A ? it.si : it.sc, truthA = it.correct === A, ok = it.sc > it.si;
+        return `<div class="shot"><button class="thumb" type="button" data-k="${it.thumb}" style="${bg(P.atlas, P.items.length, it.thumb)}" aria-label="Test this drawing: ${esc(it.correct)}"></button>${mbar('A', sA, lo, hi, truthA)}${mbar('B', sB, lo, hi, !truthA)}<span class="tag ${ok ? 'ok' : 'no'}">${ok ? 'picks the right caption' : 'picks the wrong caption'}</span></div>`;
+      }).join('')}</div></div>`;
+    }).join('')}</div>`;
+  }
+  el.querySelectorAll('[data-k]').forEach(b => b.addEventListener('click', () => { loadProbe(+b.dataset.k); $('try').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}); }));
+}
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]'); if (!b) return;
+  $('tabs').querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  renderEvidence(b.dataset.tab);
+});
+
+/* ---------- why chart: caption-vs-swapped-caption text cosine ---------- */
+function renderWhy(){
+  const W = 640, rowH = 64, top = 18, left = 170, right = 24, H = top + rowH * 3 + 46;
+  const lo = .9, hi = 1, x = v => left + (v - lo) / (hi - lo) * (W - left - right);
+  const names = {'Counting':'How many', 'Spatial relationships':'Left or right', 'Attribute binding':'Which colour'};
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cosine similarity between each correct caption and its swapped version, per test">`;
+  for (let t = 90; t <= 100; t += 2){ const v = t / 100, X = x(v); s += `<line x1="${X}" x2="${X}" y1="${top - 6}" y2="${top + rowH * 3}" stroke="#283142" stroke-width="1"/><text x="${X}" y="${top + rowH * 3 + 18}" fill="#8d95a2" font-family="JetBrains Mono, monospace" font-size="11" text-anchor="middle">${v.toFixed(2)}</text>`; }
+  s += `<text x="${W - right}" y="${H - 4}" fill="#8d95a2" font-family="JetBrains Mono, monospace" font-size="11" text-anchor="end">cosine( caption , swapped caption ) →  1.00 = identical</text>`;
+  ['Spatial relationships', 'Attribute binding', 'Counting'].forEach((e, r) => {
+    const cy = top + rowH * r + rowH / 2, its = byExp(e), mean = its.reduce((a, it) => a + it.tt, 0) / its.length;
+    s += `<text x="${left - 14}" y="${cy + 5}" fill="#ece6da" font-family="STIX Two Text, Georgia, serif" font-size="16" text-anchor="end">${names[e]}</text>`;
+    its.forEach((it, i) => { const j = ((i * 37) % 11 - 5) * 2.6; s += `<circle cx="${x(Math.max(lo, it.tt))}" cy="${cy + j}" r="4" fill="#d99a4e" fill-opacity=".55"/>`; });
+    s += `<line x1="${x(mean)}" x2="${x(mean)}" y1="${cy - 20}" y2="${cy + 20}" stroke="#f4e07a" stroke-width="2.5"/><text x="${x(mean) - 6}" y="${cy - 24}" fill="#f4e07a" font-family="JetBrains Mono, monospace" font-size="11" text-anchor="end">mean ${mean.toFixed(3)}</text>`;
+  });
+  $('why-chart').innerHTML = s + '</svg>';
+  const sp = byExp('Spatial relationships'); $('why-sp').textContent = (sp.reduce((a, it) => a + it.tt, 0) / sp.length).toFixed(3);
+}
+
+/* ---------- in-browser CLIP (worker) ---------- */
+const workerMain = `
+const E = createClipEngine(); let TOK = null;
+onmessage = e => { const m = e.data; try {
+  if (m.type === 'load'){ E.loadModel(m.kind, m.header, m.buffer); postMessage({type:'done', id:m.id}); }
+  else if (m.type === 'tok'){ TOK = createTokenizer(m.merges); postMessage({type:'done', id:m.id}); }
+  else if (m.type === 'text'){ const out = m.texts.map(t => { const ids = TOK.encode(t); return {emb:E.encodeText(ids), pieces:ids.slice(1, -1).map(i => TOK.decode([i]).trim())}; }); postMessage({type:'done', id:m.id, out}); }
+  else if (m.type === 'image'){ const emb = E.encodeImage(m.pixels, p => postMessage({type:'progress', id:m.id, p})); postMessage({type:'done', id:m.id, out:emb}); }
+} catch (err){ postMessage({type:'error', id:m.id, message:String(err && err.message || err)}); } };`;
+let worker = null, msgId = 0; const pending = new Map();
+function getWorker(){
+  if (worker) return worker;
+  worker = new Worker(URL.createObjectURL(new Blob([$('engine-src').textContent, workerMain], {type:'text/javascript'})));
+  worker.onmessage = e => { const m = e.data, p = pending.get(m.id); if (!p) return; if (m.type === 'progress') return p.onProgress && p.onProgress(m.p); pending.delete(m.id); m.type === 'error' ? p.reject(new Error(m.message)) : p.resolve(m.out); };
+  return worker;
+}
+function call(msg, transfer = [], onProgress){ return new Promise((resolve, reject) => { const id = ++msgId; pending.set(id, {resolve, reject, onProgress}); getWorker().postMessage({...msg, id}, transfer); }); }
+
+const loaded = {}, loading = {};
+async function cachedFetch(url){
+  let cache = null; try { cache = await caches.open('clip-vitb32-int8-v1'); } catch {}
+  if (cache){ try { const hit = await cache.match(url); if (hit) return hit; } catch {} }
+  const r = await fetch(url); if (!r.ok) throw new Error(`Could not download ${url} (HTTP ${r.status}).`);
+  if (cache){ try { await cache.put(url, r.clone()); } catch {} }
+  return r;
+}
+function ensure(kind){
+  if (loaded[kind]) return Promise.resolve();
+  if (loading[kind]) return loading[kind];
+  const st = $('st-' + kind), pg = $('pg-' + kind);
+  return loading[kind] = (async () => {
+    st.className = 'st'; st.textContent = 'downloading…';
+    const header = await (await cachedFetch(`model/${kind}.json`)).json();
+    const buf = new ArrayBuffer(header.bytes), u8 = new Uint8Array(buf); let off = 0;
+    for (const c of header.chunks){
+      const b = new Uint8Array(await (await cachedFetch(`model/${c}`)).arrayBuffer()); u8.set(b, off); off += b.length;
+      pg.style.width = (off / header.bytes * 100) + '%'; st.textContent = `${(off / 1e6).toFixed(0)} / ${(header.bytes / 1e6).toFixed(0)} MB`;
+    }
+    st.textContent = 'starting…';
+    await call({type:'load', kind, header, buffer:buf}, [buf]);
+    if (kind === 'text') await call({type:'tok', merges:await (await cachedFetch('model/bpe_merges.txt')).text()});
+    loaded[kind] = true; st.className = 'st ok'; st.textContent = 'ready';
+  })().catch(err => { loading[kind] = null; st.textContent = 'failed'; pg.style.width = '0'; throw err; });
+}
+
+/* ---------- tester ---------- */
+let current = null;       // {kind:'probe'|'photo'|'upload', k?, emb?, pixels?, label, url?}
+const textCache = new Map();
+function setImage(img){ current = img; $('results').innerHTML = ''; $('res-note').textContent = '';
+  const d = $('drop');
+  if (img.kind === 'upload') d.innerHTML = `<img src="${img.url}" alt="Your uploaded image"><span class="src">${esc(img.label)}</span>`;
+  else { const at = img.kind === 'probe' ? P.atlas : P.photo_atlas, n = img.kind === 'probe' ? P.items.length : P.photos.length;
+    d.innerHTML = `<div class="bg" role="img" aria-label="${esc(img.label)}" style="${bg(at, n, img.k)}"></div><span class="src">${esc(img.label)}</span>`; }
+}
+function loadProbe(k){ const it = P.items[k]; setImage({kind:'probe', k, emb:PV.subarray(k * 512, k * 512 + 512), label:`drawing ${it.id}`});
+  const lines = it.exp === 'Counting' ? P.count_prompts : [it.correct, it.incorrect]; $('caps').value = lines.join('\n'); }
+function loadPhoto(k){ setImage({kind:'photo', k, emb:PH.subarray(k * 512, k * 512 + 512), label:`photo: ${P.photos[k].caption}`}); }
+
+const PRESETS = [
+  {name:'Left or right?', probe:30, caps:['A red cube to the left of a blue sphere.', 'A red cube to the right of a blue sphere.', 'A blue sphere to the left of a red cube.', 'A blue sphere to the right of a red cube.']},
+  {name:'Which colour?', probe:60, caps:['A red cube beside a blue sphere.', 'A blue cube beside a red sphere.', 'A red sphere beside a blue cube.', 'A blue sphere beside a red cube.']},
+  {name:'How many apples?', probe:2, caps:null},
+  {name:'Word salad (photo)', photo:28, caps:['a golden retriever lying on the grass', 'the grass lying on a golden retriever', 'grass the on lying retriever golden a', 'a cat lying on the grass']},
+  {name:'Swapped colours (photo)', photo:1, caps:['an espresso in a red cup on a wooden table', 'an espresso in a wooden cup on a red table', 'a red espresso in a wooden cup on a table', 'a cup of tea in a blue cup']},
+];
+$('presets').innerHTML = PRESETS.map((p, i) => `<button type="button" data-i="${i}">${esc(p.name)}</button>`).join('');
+$('presets').addEventListener('click', e => {
+  const b = e.target.closest('button[data-i]'); if (!b) return; const p = PRESETS[+b.dataset.i];
+  if (p.probe != null) loadProbe(p.probe); else loadPhoto(p.photo);
+  if (p.caps) $('caps').value = p.caps.join('\n');
+});
+let probeCursor = 30;
+$('prev-img').addEventListener('click', () => { probeCursor = (probeCursor + P.items.length - 1) % P.items.length; loadProbe(probeCursor); });
+$('next-img').addEventListener('click', () => { probeCursor = (probeCursor + 1) % P.items.length; loadProbe(probeCursor); });
+
+function decodeToImage(blob){
+  return new Promise((resolve, reject) => { const url = URL.createObjectURL(blob), im = new Image(); im.onload = () => resolve({im, url}); im.onerror = () => reject(new Error('That file could not be read as an image. Try a JPEG or PNG.')); im.src = url; });
+}
+function preprocess(im){
+  // CLIP: resize shortest side to 224 (high-quality, stepwise), centre-crop 224×224, normalize per channel
+  let src = im, w = im.naturalWidth, h = im.naturalHeight;
+  const target = 224 / Math.min(w, h);
+  while (Math.min(w, h) * .5 > 224){ const c = document.createElement('canvas'); c.width = Math.round(w / 2); c.height = Math.round(h / 2); const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height); src = c; w = c.width; h = c.height; }
+  const s = 224 / Math.min(w, h), dw = w * s, dh = h * s;
+  const c = document.createElement('canvas'); c.width = c.height = 224; const x = c.getContext('2d');
+  x.imageSmoothingQuality = 'high'; x.drawImage(src, (224 - dw) / 2, (224 - dh) / 2, dw, dh);
+  const d = x.getImageData(0, 0, 224, 224).data, out = new Float32Array(3 * 224 * 224);
+  const mean = [0.48145466, 0.4578275, 0.40821073], std = [0.26862954, 0.26130258, 0.27577711];
+  for (let i = 0; i < 224 * 224; i++) for (let ch = 0; ch < 3; ch++) out[ch * 224 * 224 + i] = (d[i * 4 + ch] / 255 - mean[ch]) / std[ch];
+  return out;
+}
+async function useFile(file){
+  if (!file || !file.type.startsWith('image/')){ showErr('Choose an image file (JPEG, PNG, WebP or GIF).'); return; }
+  try { const {im, url} = await decodeToImage(file); setImage({kind:'upload', url, pixels:preprocess(im), label:file.name || 'pasted image'}); hideErr(); }
+  catch (e){ showErr(e.message); }
+}
+$('file').addEventListener('change', e => useFile(e.target.files[0]));
+const drop = $('drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); useFile(e.dataTransfer.files[0]); });
+document.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/')); if (f) useFile(f); });
+
+function showErr(m){ const el = $('err'); el.textContent = m; el.hidden = false; }
+function hideErr(){ $('err').hidden = true; }
+
+const SWAPS = [['left', 'right'], ['above', 'below'], ['on top of', 'underneath'], ['in front of', 'behind'], ['before', 'after'], ['inside', 'outside'], ['bigger', 'smaller'], ['larger', 'smaller']];
+const COLORS = ['red', 'blue', 'green', 'yellow', 'black', 'white', 'orange', 'purple', 'pink', 'brown', 'grey', 'gray', 'silver', 'golden', 'wooden'];
+const NUMS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+function variants(s){
+  const out = new Set(), low = s.toLowerCase();
+  for (const [a, b] of SWAPS){
+    const re = new RegExp(`\\b(${a}|${b})\\b`, 'gi');
+    if (re.test(s)) out.add(s.replace(re, m => (m.toLowerCase() === a ? b : a)));
+  }
+  const cols = [...new Set((low.match(new RegExp(`\\b(${COLORS.join('|')})\\b`, 'g')) || []))];
+  if (cols.length >= 2){ const [a, b] = cols; out.add(s.replace(new RegExp(`\\b(${a}|${b})\\b`, 'gi'), m => m.toLowerCase() === a ? b : a)); }
+  const nm = low.match(new RegExp(`\\b(${NUMS.join('|')})\\b`));
+  if (nm){ const i = NUMS.indexOf(nm[1]); for (const j of [i - 1, i + 1]) if (j >= 0 && j < NUMS.length) out.add(s.replace(new RegExp(`\\b${nm[1]}\\b`, 'i'), m => m[0] === m[0].toUpperCase() ? NUMS[j][0].toUpperCase() + NUMS[j].slice(1) : NUMS[j])); }
+  const dig = s.match(/\b(\d+)\b/); if (dig){ const n = +dig[1]; out.add(s.replace(dig[1], String(n + 1))); if (n > 1) out.add(s.replace(dig[1], String(n - 1))); }
+  const words = s.replace(/[.!?]$/, '').split(/\s+/);
+  if (words.length > 3){ const r = [...words]; for (let i = r.length - 1; i > 0; i--){ const j = (i * 7 + 3) % (i + 1); [r[i], r[j]] = [r[j], r[i]]; } out.add(r.join(' ')); }
+  out.delete(s);
+  return [...out];
+}
+$('swap').addEventListener('click', () => {
+  const lines = $('caps').value.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length){ showErr('Write a caption on line 1 first.'); return; }
+  const v = variants(lines[0]).filter(x => !lines.includes(x));
+  if (!v.length){ showErr('No swap found in line 1. Try words like left/right, two colours, or a number.'); return; }
+  hideErr(); $('caps').value = [...lines, ...v].slice(0, 8).join('\n');
+});
+
+$('run').addEventListener('click', async () => {
+  const caps = [...new Set($('caps').value.split('\n').map(l => l.trim()).filter(Boolean))].slice(0, 8);
+  if (!current){ showErr('Choose or upload an image first.'); return; }
+  if (caps.length < 2){ showErr('Write at least two captions, one per line, so CLIP has something to choose between.'); return; }
+  hideErr(); const btn = $('run'); btn.disabled = true;
+  try {
+    const needVision = current.kind === 'upload' && !current.emb;
+    btn.textContent = 'Loading CLIP…';
+    await Promise.all([ensure('text'), needVision ? ensure('vision') : null]);
+    if (needVision){
+      btn.textContent = 'Encoding image…';
+      const img = current, px = img.pixels.slice();
+      img.emb = Float32Array.from(await call({type:'image', pixels:px}, [px.buffer], p => { btn.textContent = `Encoding image… ${Math.round(p * 100)}%`; }));
+    }
+    btn.textContent = 'Encoding captions…';
+    const todo = caps.filter(c => !textCache.has(c));
+    if (todo.length){ const out = await call({type:'text', texts:todo}); todo.forEach((c, i) => textCache.set(c, {emb:Float32Array.from(out[i].emb), pieces:out[i].pieces})); }
+    renderResults(caps);
+  } catch (e){ showErr(`${e.message} Check your connection and press Run again.`); }
+  finally { btn.disabled = false; btn.textContent = 'Run CLIP'; }
+});
+function renderResults(caps){
+  const I = current.emb, rows = caps.map(c => { const t = textCache.get(c); let s = 0; for (let k = 0; k < 512; k++) s += I[k] * t.emb[k]; return {c, s, pieces:t.pieces}; });
+  const m = Math.max(...rows.map(r => r.s * 100)), ex = rows.map(r => Math.exp(r.s * 100 - m)), Z = ex.reduce((a, b) => a + b, 0);
+  rows.forEach((r, i) => r.p = ex[i] / Z);
+  const lo = Math.min(...rows.map(r => r.s)) - .02, hi = Math.max(...rows.map(r => r.s)), best = rows.reduce((a, b) => b.s > a.s ? b : a);
+  $('results').innerHTML = rows.map(r => `<div class="res${r === best ? ' win' : ''}"><div class="cap">${esc(r.c)}</div><div class="bar"><b style="width:${Math.max(2, (r.s - lo) / (hi - lo) * 100)}%"></b></div><div class="num">${fmt(r.s)}<small>${(r.p * 100).toFixed(1)}%</small></div><div class="toks">tokens: ${r.pieces.map(esc).join(' · ')}</div></div>`).join('');
+  let minTT = 1, pair = null;
+  for (let a = 0; a < rows.length; a++) for (let b = a + 1; b < rows.length; b++){ const A = textCache.get(rows[a].c).emb, B = textCache.get(rows[b].c).emb; let s = 0; for (let k = 0; k < 512; k++) s += A[k] * B[k]; if (s < minTT){ minTT = s; pair = [a + 1, b + 1]; } }
+  $('res-note').innerHTML = `First number: cosine similarity with the image. Second: CLIP’s probability after multiplying by its learned scale of 100 and taking a softmax over these captions. Even the two most different captions here have a text-to-text cosine of <b>${minTT.toFixed(3)}</b> (lines ${pair[0]} and ${pair[1]}); the closer that is to 1, the less CLIP can tell them apart.`;
+}
+
+/* ---------- boot ---------- */
+(async () => {
+  P = await (await fetch('data/probes.json')).json();
+  PV = unpack(P.int8_probe_vecs); PH = unpack(P.int8_photo_vecs);
+  renderBoard(); renderEvidence('Spatial relationships'); renderWhy();
+  loadProbe(30); $('caps').value = PRESETS[0].caps.join('\n');
+})().catch(() => { $('board').innerHTML = '<p class="err">The probe data did not load. Reload the page to try again.</p>'; });
+})();
+</script>
+</body>
+</html>

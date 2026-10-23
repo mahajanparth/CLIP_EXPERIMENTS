@@ -1,0 +1,862 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>How CLIP Works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single "video" column — 16:9 stage, transport bar, subtitle, then a contact-sheet of scenes. Deliberately dark-only, in the 3Blue1Brown idiom. */
+:root{
+  --bg:#0e1116; --surface:#161b24; --ink:#ece6da; --muted:#8d95a2; --line:#283142;
+  --blue:#58c4dd; --gold:#d99a4e; --yellow:#f4e07a; --green:#83c167; --red:#fc6255;
+  --serif:"STIX Two Text","STIX Two","Cambria Math",Georgia,serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.55}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:36px 64px;display:grid;gap:28px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0}
+h1{font-size:clamp(2.1rem,5vw,3.3rem);font-weight:400;line-height:1.1;margin:.25em 0 .2em;text-wrap:balance}
+h1 em{color:var(--blue);font-style:italic}
+h1 span{color:var(--gold)}
+.lede{color:var(--muted);max-width:62ch;margin:0}
+.demo-link{display:inline-block;margin-top:14px;font-family:var(--mono);font-size:13px;color:var(--blue);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:7px 14px}
+.demo-link:hover{border-color:var(--blue)}
+.player{display:grid;gap:14px}
+.stage{position:relative;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--bg)}
+canvas{display:block;width:100%;aspect-ratio:16/9;max-width:100%}
+.start{position:absolute;inset:0;display:grid;place-items:center;background:rgba(14,17,22,.55);border:0;cursor:pointer;color:var(--ink);font:inherit}
+.start span{display:inline-flex;align-items:center;gap:10px;padding:12px 22px;border-radius:999px;background:var(--blue);color:var(--bg);font-family:var(--mono);font-size:14px;font-weight:500;letter-spacing:.04em}
+.start:focus-visible span{outline:2px solid var(--yellow);outline-offset:3px}
+.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.btns{display:flex;gap:8px}
+.btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
+.btn:hover{border-color:var(--blue)}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:var(--bg)}
+.btn svg{width:16px;height:16px;fill:currentColor}
+:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.now{font-family:var(--mono);font-size:13px;color:var(--muted);white-space:nowrap}
+.now b{color:var(--ink);font-weight:500}
+.timeline{display:flex;gap:4px;flex:1 1 280px;min-width:0}
+.seg{flex:1;height:24px;padding:0;border:0;background:none;cursor:pointer;display:flex;align-items:center;min-width:0}
+.seg i{display:block;height:4px;width:100%;background:var(--line);border-radius:2px;overflow:hidden;position:relative;transition:height .15s}
+.seg i b{position:absolute;inset:0 auto 0 0;background:var(--blue);width:0}
+.seg:hover i{height:7px}
+.caption{font-size:1.24rem;line-height:1.5;min-height:4.6em;max-width:70ch;margin:0;transition:opacity .25s}
+.mathbox{border-top:1px solid var(--line);padding-top:16px;display:grid;gap:12px}
+.mathbox .mh{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.mathbox .mh span{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.mathbox .mh button{font-family:var(--mono);font-size:12px;background:none;border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:3px 10px;cursor:pointer}
+.mathbox .mh button:hover{color:var(--ink);border-color:var(--blue)}
+.eqs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.eq{background:var(--bg);padding:14px 16px;display:grid;gap:8px;align-content:start;min-width:0}
+.eq .f{overflow-x:auto;overflow-y:hidden;padding-block:2px}
+math{font-family:"STIX Two Math","Latin Modern Math","Cambria Math",math;font-size:1.12em;color:var(--ink)}
+math[display="block"]{margin:0;text-align:left;justify-content:flex-start}
+.eq .f math+math{margin-top:6px}
+.eq p{margin:0;font-size:.92rem;color:var(--muted);line-height:1.45}
+.eq p b{color:var(--ink);font-weight:400;font-family:var(--mono);font-size:.85rem}
+.shapes{border-collapse:collapse;font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;width:100%}
+.shapes th,.shapes td{text-align:left;padding:4px 10px 4px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.shapes th{color:var(--muted);font-weight:400}
+.caption i{font-style:italic}
+.ctrl{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:13px;color:var(--muted)}
+.ctrl label{color:var(--ink)}
+.ctrl output{color:var(--gold);min-width:4ch;font-variant-numeric:tabular-nums}
+input[type=range]{accent-color:var(--gold);width:min(320px,100%)}
+.pick{display:flex;gap:8px;flex-wrap:wrap}
+.pick button{font-family:var(--mono);font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.pick button[aria-pressed="true"]{border-color:var(--blue);color:var(--blue)}
+h2{font-size:1.35rem;font-weight:400;margin:0 0 12px}
+.chapters ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.chapters button{all:unset;box-sizing:border-box;display:grid;gap:4px;width:100%;height:100%;padding:16px 18px;background:var(--bg);cursor:pointer}
+.chapters button:hover{background:var(--surface)}
+.chapters button:focus-visible{outline:2px solid var(--yellow);outline-offset:-2px}
+.chapters .n{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.08em}
+.chapters .t{font-size:1.08rem}
+.chapters .s{font-size:.92rem;color:var(--muted);line-height:1.45}
+.chapters button[aria-current="step"]{background:var(--surface)}
+.chapters button[aria-current="step"] .n{color:var(--blue)}
+.notes{color:var(--muted);font-size:.95rem;max-width:72ch;display:grid;gap:8px}
+.notes p{margin:0}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--ink)}
+@media (max-width:560px){.caption{font-size:1.08rem}.now{white-space:normal}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<main class="wrap">
+  <header>
+    <p class="eyebrow">A visual walkthrough · Radford et al., 2021</p>
+    <h1>How <em>CLIP</em> Works</h1>
+    <p class="lede">CLIP learns to put pictures and sentences in the same space, so that a photo of a dog lands next to the words “a photo of a dog.” Nine short animated scenes build it up from pixels to zero-shot classification.</p>
+    <a class="demo-link" href="demo.html">Explore real CLIP embeddings with PCA and t-SNE →</a>
+    <a class="demo-link" href="failures.html">See where CLIP fails, and test your own images →</a>
+    <a class="demo-link" href="prompts.html">See how wording changes the classifier →</a>
+    <a class="demo-link" href="zeroshot.html">Build a zero-shot classifier from your own images and classes →</a>
+  </header>
+
+  <section class="player" aria-label="Animated walkthrough">
+    <div class="stage">
+      <canvas id="cv" width="1280" height="720" aria-label="Animation of the current scene"></canvas>
+      <button class="start" id="start" type="button"><span><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2l10 6-10 6z"/></svg>Play the walkthrough</span></button>
+    </div>
+    <div class="bar">
+      <div class="btns">
+        <button class="btn" id="prev" type="button" aria-label="Previous scene"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+        <button class="btn primary" id="play" type="button" aria-label="Play"></button>
+        <button class="btn" id="next" type="button" aria-label="Next scene"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+      </div>
+      <div class="now" id="now"></div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+    <p class="caption" id="caption" aria-live="polite"></p>
+    <div class="ctrl" id="ctrl-tau" hidden>
+      <label for="tau">Temperature τ</label>
+      <input type="range" id="tau" min="0.02" max="1" step="0.01" value="0.07">
+      <output id="tau-out" for="tau">0.07</output>
+    </div>
+    <section class="mathbox" id="mathbox" aria-label="Equations and tensor shapes for this scene">
+      <div class="mh"><span>The math · ViT-B/32 shapes</span><button type="button" id="math-toggle" aria-expanded="true">Hide</button></div>
+      <div class="eqs" id="eqs"></div>
+    </section>
+    <div class="ctrl" id="ctrl-img" hidden>
+      <span>Image to classify</span>
+      <div class="pick" id="pick"></div>
+    </div>
+  </section>
+
+  <section class="chapters" aria-labelledby="ch-h">
+    <h2 id="ch-h">Scenes</h2>
+    <ol id="chapters"></ol>
+  </section>
+
+  <footer class="notes">
+    <p>Keys: <kbd>Space</kbd> play or pause, <kbd>←</kbd> <kbd>→</kbd> previous or next scene.</p>
+    <p>Sizes follow the ViT-B/32 model: 224 × 224 input, a 7 × 7 grid of 32-pixel patches, 768-wide image features, a 12-layer text Transformer with a 77-token context, and a 512-dimensional shared space. The 2-D circles are a drawing aid; real embeddings sit on a 512-dimensional sphere. Similarity numbers in scenes 5–8 are illustrative.</p>
+  </footer>
+</main>
+
+<script>
+(() => {
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const W = 1280, H = 720;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C = {bg:css('--bg'), ink:css('--ink'), muted:css('--muted'), line:css('--line'), blue:css('--blue'), gold:css('--gold'), yellow:css('--yellow'), green:css('--green'), red:css('--red')};
+const SERIF = '"STIX Two Text", "STIX Two", Georgia, serif';
+const MONO = '"JetBrains Mono", ui-monospace, Menlo, monospace';
+const EMOJI = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif';
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- math + drawing helpers ---------- */
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const smooth = x => { x = clamp(x); return x * x * (3 - 2 * x); };
+const seg = (t, a, b) => smooth((t - a) / (b - a));
+const lerp = (a, b, u) => a + (b - a) * u;
+const rad = d => d * Math.PI / 180;
+function rng(s){ return () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hexA(h, a){ h = h.replace('#',''); const n = parseInt(h, 16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+const fmt = v => (v < 0 ? '−' : '') + Math.abs(v).toFixed(2);
+const SUBD = ['₁','₂','₃','₄'];
+const softmax = v => { const m = Math.max(...v); const e = v.map(x => Math.exp(x - m)); const s = e.reduce((a, b) => a + b, 0); return e.map(x => x / s); };
+
+function font(o){ return `${o.it ? 'italic ' : ''}${o.w || 400} ${o.s || 28}px ${o.f || SERIF}`; }
+function txt(s, x, y, o = {}){
+  const a = o.a ?? 1; if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha *= a; ctx.fillStyle = o.c || C.ink; ctx.font = font(o);
+  ctx.textAlign = o.al || 'center'; ctx.textBaseline = o.bl || 'middle'; ctx.fillText(s, x, y); ctx.restore();
+}
+function write(s, x, y, u, o = {}){
+  if (u <= 0) return; if (u >= 1) return txt(s, x, y, o);
+  ctx.save(); ctx.font = font(o);
+  const w = ctx.measureText(s).width, al = o.al || 'center', sz = o.s || 28;
+  const x0 = al === 'left' ? x : al === 'right' ? x - w : x - w / 2;
+  ctx.beginPath(); ctx.rect(x0 - 6, y - sz * 1.3, (w + 12) * u, sz * 2.6); ctx.clip();
+  txt(s, x, y, o); ctx.restore();
+}
+function msym(b, s, x, y, o = {}){
+  const size = o.s || 32, a = o.a ?? 1; if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha *= a; ctx.fillStyle = o.c || C.ink; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.font = `italic 400 ${size}px ${SERIF}`; const bw = ctx.measureText(b).width;
+  ctx.font = `italic 400 ${size * .6}px ${SERIF}`; const sw = ctx.measureText(s).width;
+  const x0 = x - (bw + sw + 2) / 2;
+  ctx.font = `italic 400 ${size}px ${SERIF}`; ctx.fillText(b, x0, y);
+  ctx.font = `italic 400 ${size * .6}px ${SERIF}`; ctx.fillText(s, x0 + bw + 2, y + size * .3);
+  ctx.restore();
+}
+function wrap(s, maxW, o){
+  ctx.font = font(o); const out = []; let cur = '';
+  for (const w of s.split(' ')){ const nx = cur ? cur + ' ' + w : w; if (cur && ctx.measureText(nx).width > maxW){ out.push(cur); cur = w; } else cur = nx; }
+  if (cur) out.push(cur); return out;
+}
+function para(s, x, y, maxW, o, lh, anchor = 'top'){
+  const L = wrap(s, maxW, o), y0 = anchor === 'bottom' ? y - (L.length - 1) * lh : anchor === 'middle' ? y - (L.length - 1) * lh / 2 : y;
+  L.forEach((l, i) => txt(l, x, y0 + i * lh, o)); return L.length;
+}
+function line(x1, y1, x2, y2){ ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+function rbox(x, y, w, h, r){ ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+function arrow(x1, y1, x2, y2, o = {}){
+  const u = o.u ?? 1; if (u <= 0) return;
+  const x = lerp(x1, x2, u), y = lerp(y1, y2, u), a = Math.atan2(y - y1, x - x1), hl = o.h ?? 12, len = Math.hypot(x - x1, y - y1);
+  ctx.save(); ctx.globalAlpha *= o.a ?? 1; ctx.strokeStyle = ctx.fillStyle = o.c || C.ink; ctx.lineWidth = o.w || 2.5; ctx.lineCap = 'round';
+  if (o.dash) ctx.setLineDash(o.dash);
+  const sl = Math.max(0, len - hl * .8);
+  line(x1, y1, x1 + Math.cos(a) * sl, y1 + Math.sin(a) * sl); ctx.setLineDash([]);
+  if (len > hl * .5){ ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - hl * Math.cos(a - .42), y - hl * Math.sin(a - .42)); ctx.lineTo(x - hl * Math.cos(a + .42), y - hl * Math.sin(a + .42)); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+}
+
+/* ---------- the four "photos" ---------- */
+const KINDS = ['dog','cat','car','plane'];
+const PH = {dog:{e:'🐕', g:['#a9c98f','#4e7a3e']}, cat:{e:'🐈', g:['#d9b48f','#7a5236']}, car:{e:'🚗', g:['#9aa6b8','#3d4552']}, plane:{e:'✈️', g:['#2f5f8f','#a9d2f0']}};
+const PHOTO = {};
+KINDS.forEach(k => {
+  const c = document.createElement('canvas'); c.width = c.height = 240; const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, 240); g.addColorStop(0, PH[k].g[0]); g.addColorStop(1, PH[k].g[1]);
+  x.fillStyle = g; x.fillRect(0, 0, 240, 240);
+  x.fillStyle = 'rgba(0,0,0,.18)'; x.beginPath(); x.ellipse(120, 196, 80, 13, 0, 0, Math.PI * 2); x.fill();
+  x.font = `150px ${EMOJI}`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(PH[k].e, 120, 122);
+  PHOTO[k] = c;
+});
+function drawPhoto(k, cx, cy, s, a = 1){
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha *= a; ctx.drawImage(PHOTO[k], cx - s / 2, cy - s / 2, s, s);
+  ctx.strokeStyle = hexA(C.ink, .5); ctx.lineWidth = 1.5; ctx.strokeRect(cx - s / 2, cy - s / 2, s, s); ctx.restore();
+}
+
+/* ---------- shared pieces ---------- */
+function drawVec(cx, cy, vals, u, col){
+  if (u <= 0) return;
+  const rows = vals.length + 1, rh = 26, h = rows * rh, top = cy - h / 2, hw = 46;
+  ctx.save(); ctx.strokeStyle = hexA(C.ink, .8 * Math.min(1, u * 3)); ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx - hw + 9, top - 4); ctx.lineTo(cx - hw, top - 4); ctx.lineTo(cx - hw, top + h + 4); ctx.lineTo(cx - hw + 9, top + h + 4);
+  ctx.moveTo(cx + hw - 9, top - 4); ctx.lineTo(cx + hw, top - 4); ctx.lineTo(cx + hw, top + h + 4); ctx.lineTo(cx + hw - 9, top + h + 4);
+  ctx.stroke(); ctx.restore();
+  for (let i = 0; i < rows; i++){
+    const a = clamp(u * rows * 1.2 - i); if (a <= 0) continue;
+    txt(i < vals.length ? fmt(vals[i]) : '⋮', cx, top + rh * i + rh / 2, {f:MONO, s:16, c:col, a});
+  }
+}
+function encoder(x, y, w, h, col, label, sub, u, pulse){
+  if (u <= 0) return;
+  ctx.save(); ctx.globalAlpha *= u;
+  ctx.beginPath(); ctx.moveTo(x, y - h / 2); ctx.lineTo(x + w, y - h * .3); ctx.lineTo(x + w, y + h * .3); ctx.lineTo(x, y + h / 2); ctx.closePath();
+  ctx.fillStyle = hexA(col, .1); ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+  for (let i = 0; i < 6; i++){
+    const f = (i + 1) / 7, lx = x + w * f, hh = lerp(h / 2, h * .3, f) - 14;
+    let a = .22;
+    if (pulse > 0 && pulse < 1) a += .75 * Math.exp(-Math.pow((i / 5 - (pulse * 1.4 - .2)) * 3.2, 2));
+    ctx.strokeStyle = hexA(col, a); ctx.lineWidth = 3; line(lx, y - hh, lx, y + hh);
+  }
+  ctx.restore();
+  txt(label, x + w / 2, y - h / 2 - 30, {s:26, a:u});
+  txt(sub, x + w / 2, y + h / 2 + 28, {s:18, it:1, c:C.muted, a:u});
+}
+function pipeline(t, o){
+  const t0 = o.t0;
+  arrow(725, 360, 786, 360, {u:seg(t, t0, t0 + .5)});
+  drawVec(838, 360, o.fv, seg(t, t0 + .3, t0 + 1.6), C.ink);
+  write(o.featLbl, 838, 228, seg(t, t0 + .5, t0 + 1.4), {s:19, c:C.muted, it:1});
+  arrow(890, 360, 914, 360, {u:seg(t, t0 + 2, t0 + 2.3)});
+  const pb = seg(t, t0 + 2.1, t0 + 2.7);
+  if (pb > 0){
+    ctx.save(); ctx.globalAlpha *= pb; ctx.strokeStyle = o.col; ctx.lineWidth = 2; ctx.fillStyle = hexA(o.col, .12);
+    rbox(918, 328, 64, 64, 6); ctx.fill(); ctx.stroke(); ctx.restore();
+    msym('W', o.W, 950, 358, {s:30, a:pb});
+  }
+  write(o.projLbl, 950, 412, seg(t, t0 + 2.4, t0 + 3), {s:16, c:C.muted, it:1});
+  arrow(986, 360, 1066, 360, {u:seg(t, t0 + 2.7, t0 + 3.1)});
+  drawVec(1120, 360, o.ov, seg(t, t0 + 3, t0 + 4.4), o.col);
+  write(o.out, 1120, 222, seg(t, t0 + 3.4, t0 + 4), {s:42, it:1, c:o.col});
+  write(`${o.out} ∈ ℝ⁵¹², ‖${o.out}‖ = 1`, 1120, 498, seg(t, t0 + 4, t0 + 5), {s:19, c:C.muted, it:1});
+}
+function tokenBox(s, x, y, o = {}){
+  const a = o.a ?? 1; if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha *= a;
+  const w = o.w || 110, h = 38;
+  rbox(x - w / 2, y - h / 2, w, h, 6); ctx.fillStyle = hexA(C.gold, .1); ctx.fill();
+  ctx.strokeStyle = o.hl ? C.yellow : hexA(C.gold, .8); ctx.lineWidth = o.hl ? 3 : 1.5; ctx.stroke(); ctx.restore();
+  const special = s.startsWith('[');
+  txt(s, x, y + 1, special ? {f:MONO, s:15, c:C.muted, a} : {s:o.s || 22, it:1, a});
+}
+function heat(v){ return v >= 0 ? hexA(C.blue, Math.min(.85, v * .9)) : hexA(C.red, Math.min(.7, -v * .9)); }
+
+/* ---------- data ---------- */
+const R1 = rng(7);
+const vec = (n, s) => Array.from({length:n}, () => +((R1() * 2 - 1) * s).toFixed(2));
+const V_IMGF = vec(7, 1.8), V_I = vec(7, .12), V_TXTF = vec(7, 1.8), V_T = vec(7, .12);
+const R2 = rng(11);
+const M5 = KINDS.map(() => KINDS.map(() => +(R2() * .5 - .15).toFixed(2)));
+const M6 = [[.62,.41,-.10,.05],[.38,.55,.02,-.12],[-.05,.10,.48,.30],[.08,-.15,.36,.51]];
+const WORDS = ['dog','cat','car','plane'];
+const SENT = ['a dog running on the grass','a cat asleep on a sofa','a red car parked on a street','a plane taking off at sunset'];
+const INIT = {I:[200,15,280,300], T:[80,140,150,370]}, FIN = {I:[40,75,205,250], T:[48,83,213,258]};
+const angles = p => ({I:INIT.I.map((a, i) => rad(lerp(a, FIN.I[i], p))), T:INIT.T.map((a, i) => rad(lerp(a, FIN.T[i], p)))});
+const simM = p => { const A = angles(p); return A.I.map(a => A.T.map(b => Math.cos(a - b))); };
+function clipLoss(M, tau){
+  const n = M.length; let L = 0;
+  for (let i = 0; i < n; i++) L -= Math.log(softmax(M[i].map(x => x / tau))[i]);
+  for (let j = 0; j < n; j++) L -= Math.log(softmax(M.map(r => r[j] / tau))[j]);
+  return L / (2 * n);
+}
+const ease7 = u => 1 - Math.pow(1 - u, 3);
+const LOSS = Array.from({length:121}, (_, k) => clipLoss(simM(ease7(k / 120)), .07));
+const LMAX = Math.max(...LOSS);
+const SIM8 = {dog:[.302,.271,.186,.179], cat:[.258,.297,.181,.174], car:[.169,.172,.289,.231], plane:[.171,.168,.224,.284]};
+
+const s4 = {aI:rad(48)}, A_TDOG = rad(72), A_TCAR = rad(152);
+const s6 = {r:0, tau:.07};
+const s8 = {k:'dog'};
+
+/* ---------- scenes ---------- */
+function sc1(t){
+  write('Images', 320, 110, seg(t, 0, 1), {s:34, c:C.blue});
+  write('Text', 960, 110, seg(t, .3, 1.3), {s:34, c:C.gold});
+  const pa = seg(t, .8, 2);
+  drawPhoto('dog', 320, 310, lerp(200, 240, pa), pa);
+  const ga = seg(t, 6, 7) * (1 - seg(t, 8.5, 9.5));
+  if (ga > 0){
+    ctx.save(); ctx.strokeStyle = hexA(C.ink, .35 * ga); ctx.lineWidth = 1;
+    for (let i = 1; i < 16; i++){ const d = 200 + i * 15; line(d, 190, d, 430); line(200, 190 + i * 15, 440, 190 + i * 15); }
+    ctx.restore();
+  }
+  write(SENT[0], 960, 290, seg(t, 2, 3.5), {s:36, it:1});
+  const toks = SENT[0].split(' ');
+  ctx.font = font({s:22, it:1});
+  const ws = toks.map(s => ctx.measureText(s).width + 28), tot = ws.reduce((a, b) => a + b, 0) + 10 * 4;
+  let x = 960 - tot / 2;
+  toks.forEach((s, i) => { tokenBox(s, x + ws[i] / 2, 380, {w:ws[i], a:seg(t, 6.4 + i * .15, 7 + i * .15)}); x += ws[i] + 10; });
+  const qa = seg(t, 4, 5);
+  arrow(640, 310, 465, 310, {u:qa, c:C.yellow, dash:[8, 8], w:2});
+  arrow(640, 310, 745, 310, {u:qa, c:C.yellow, dash:[8, 8], w:2});
+  write('?', 640, 262, seg(t, 4.5, 5.3), {s:58, c:C.yellow});
+  write('224 × 224 × 3 = 150,528 pixel values', 320, 470, seg(t, 6, 7.5), {s:22, c:C.muted});
+  write('tokens from a 49,152-entry vocabulary', 960, 470, seg(t, 7, 8.5), {s:22, c:C.muted});
+  write('Goal: one space where both can be compared', 640, 600, seg(t, 9.5, 11.5), {s:32});
+}
+
+function sc2(t){
+  const cx = 200, cy = 360, S = 240, ps = 60, ex = seg(t, 1, 2.6);
+  txt('224 × 224 image', cx, cy - S / 2 - 34, {s:20, c:C.muted, it:1, a:1 - seg(t, 1, 1.8)});
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++){
+    const k = r * 4 + c, st = 4 + k * .14;
+    const fly = seg(t, st, st + 1.1), fade = 1 - seg(t, st + .8, st + 1.2);
+    if (fade <= 0) continue;
+    const hx = cx - S / 2 + c * ps + ps / 2 + (c - 1.5) * 14 * ex, hy = cy - S / 2 + r * ps + ps / 2 + (r - 1.5) * 14 * ex;
+    const x = lerp(hx, 505, fly), y = lerp(hy, cy + (r - 1.5) * 34 + (c - 1.5) * 7, fly), sz = lerp(ps, 18, fly);
+    ctx.save(); ctx.globalAlpha = fade;
+    ctx.drawImage(PHOTO.dog, c * 60, r * 60, 60, 60, x - sz / 2, y - sz / 2, sz, sz);
+    ctx.strokeStyle = hexA(C.ink, .25 + .4 * ex); ctx.lineWidth = 1.2; ctx.strokeRect(x - sz / 2, y - sz / 2, sz, sz);
+    ctx.restore();
+  }
+  const la = seg(t, 2, 3) * (1 - seg(t, 5, 6));
+  txt('49 patches × 3,072 values', cx, cy + S / 2 + 46, {s:20, c:C.muted, it:1, a:la});
+  txt('(drawn 4 × 4; ViT-B/32 uses 7 × 7)', cx, cy + S / 2 + 74, {s:16, c:C.muted, it:1, a:la});
+  encoder(500, 360, 220, 300, C.blue, 'Image Encoder', 'ViT-B/32 · 12 layers · width 768 · 12 heads', seg(t, .5, 1.5), (t - 6.6) / 2.6);
+  pipeline(t, {t0:9, col:C.blue, fv:V_IMGF, ov:V_I, featLbl:'h ∈ ℝ⁷⁶⁸', projLbl:'Wᵢ: 512 × 768', W:'i', out:'I'});
+}
+
+const TOK = ['[SOS]', ...SENT[0].split(' '), '[EOS]'], NT = TOK.length;
+function sc3(t){
+  const cx = 210, Y = i => 360 + (i - (NT - 1) / 2) * 48;
+  ctx.font = font({s:30, it:1});
+  const words = TOK.slice(1, NT - 1), sp = ctx.measureText(' ').width, ws = words.map(w => ctx.measureText(w).width);
+  let xx = cx - (ws.reduce((a, b) => a + b, 0) + sp * 4) / 2;
+  const wx = ws.map(w => { const c = xx + w / 2; xx += w + sp; return c; });
+  const mv = seg(t, 2, 3.6), hl = t > 7;
+  if (t < 2) write(SENT[0], cx, 360, seg(t, 0, 1.5), {s:30, it:1});
+  else TOK.forEach((s, i) => {
+    if (i === 0 || i === NT - 1) return tokenBox(s, cx, Y(i), {a:seg(t, 3, 3.8), hl:i === NT - 1 && hl});
+    const x = lerp(wx[i - 1], cx, mv), y = lerp(360, Y(i), mv);
+    ctx.save(); ctx.globalAlpha = mv; rbox(x - 55, y - 19, 110, 38, 6); ctx.fillStyle = hexA(C.gold, .1); ctx.fill();
+    ctx.strokeStyle = hexA(C.gold, .8); ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
+    txt(s, x, y + 1, {s:lerp(30, 22, mv), it:1});
+  });
+  for (let i = 0; i < NT; i++) arrow(cx + 58, Y(i), 500, 360 + (i - (NT - 1) / 2) * 30, {u:seg(t, 4 + i * .15, 4.8 + i * .15), c:hexA(C.gold, .7), w:1.8, h:9});
+  encoder(500, 360, 220, 300, C.gold, 'Text Encoder', '12 layers · width 512 · 8 heads · causal', seg(t, .5, 1.5), (t - 6) / 2.4);
+  write('summary read at [EOS]', 610, 572, seg(t, 7.4, 8.4), {s:18, c:C.yellow, it:1});
+  pipeline(t, {t0:9, col:C.gold, fv:V_TXTF, ov:V_T, featLbl:'u ∈ ℝ⁵¹²', projLbl:'Wₜ: 512 × 512', W:'t', out:'T'});
+}
+
+function sc4(t){
+  const O = {x:400, y:385}, R = 230;
+  const tip = (a, r = R) => [O.x + r * Math.cos(a), O.y - r * Math.sin(a)];
+  const ga = seg(t, 0, 1);
+  ctx.save(); ctx.globalAlpha = ga; ctx.lineWidth = 1; ctx.strokeStyle = hexA(C.blue, .13);
+  for (let x = O.x - 300; x <= O.x + 300; x += 60) line(x, 85, x, 685);
+  for (let y = O.y - 300; y <= O.y + 300; y += 60) if (y >= 85 && y <= 685) line(O.x - 300, y, O.x + 300, y);
+  ctx.strokeStyle = hexA(C.ink, .45); line(O.x - 300, O.y, O.x + 300, O.y); line(O.x, 85, O.x, 685);
+  ctx.restore();
+  const ca = seg(t, .5, 2);
+  if (ca > 0){ ctx.save(); ctx.strokeStyle = hexA(C.ink, .75); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(O.x, O.y, R, 0, -Math.PI * 2 * ca, true); ctx.stroke(); ctx.restore(); }
+  txt('the real space has 512 dimensions; we draw 2', O.x, 690, {s:17, it:1, c:C.muted, a:seg(t, 1, 2)});
+  const ui = seg(t, 2, 3.2), ud = seg(t, 2.5, 3.7), uc = seg(t, 10, 11.2);
+  const [ix, iy] = tip(s4.aI), [dx, dy] = tip(A_TDOG), [kx, ky] = tip(A_TCAR);
+  arrow(O.x, O.y, kx, ky, {u:uc, c:C.gold, w:3, h:14, a:.75});
+  arrow(O.x, O.y, dx, dy, {u:ud, c:C.gold, w:3.5, h:16});
+  arrow(O.x, O.y, ix, iy, {u:ui, c:C.blue, w:3.5, h:16});
+  const [px, py] = tip(s4.aI, R + 46); drawPhoto('dog', px, py, 58, seg(t, 3, 3.8));
+  const lab = (s, a, al) => { const [x, y] = tip(a, R + 24); para(s, x, y, 165, {s:21, it:1, c:C.gold, al:Math.cos(a) >= 0 ? 'left' : 'right', a:al}, 25, 'middle'); };
+  lab(SENT[0], A_TDOG, seg(t, 3.3, 4));
+  lab(SENT[2], A_TCAR, seg(t, 10.8, 11.5));
+  txt('I', ...tip(s4.aI, R * .55).map((v, i) => v + (i ? -16 : 14)), {s:28, it:1, c:C.blue, a:seg(t, 3, 3.8)});
+  const aa = seg(t, 4.5, 6);
+  if (aa > 0){
+    let d = A_TDOG - s4.aI; d = Math.atan2(Math.sin(d), Math.cos(d));
+    ctx.save(); ctx.strokeStyle = C.yellow; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(O.x, O.y, 64, -s4.aI, -(s4.aI + d * aa), d > 0); ctx.stroke(); ctx.restore();
+    const [tx, ty] = tip(s4.aI + d / 2, 92); txt('θ', tx, ty, {s:28, it:1, c:C.yellow, a:aa});
+  }
+  write('I · T = cos θ', 1010, 160, seg(t, 6, 7.5), {s:44, it:1});
+  write('for vectors of length 1', 1010, 212, seg(t, 6.8, 7.8), {s:20, c:C.muted, it:1});
+  simBar(SENT[0], Math.cos(s4.aI - A_TDOG), 330, seg(t, 7.5, 8.5));
+  simBar(SENT[2], Math.cos(s4.aI - A_TCAR), 470, seg(t, 10.8, 11.8));
+  txt('drag on the left to rotate I', 1010, 600, {s:18, it:1, c:C.blue, a:seg(t, 12, 13)});
+}
+function simBar(label, v, y, a){
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = a;
+  txt(label, 830, y - 40, {s:22, it:1, c:C.gold, al:'left'});
+  ctx.strokeStyle = hexA(C.ink, .5); ctx.lineWidth = 1.5; line(830, y, 1190, y);
+  [[-1, 830], [0, 1010], [1, 1190]].forEach(([n, x]) => { line(x, y - 6, x, y + 6); txt(n < 0 ? '−1' : String(n), x, y + 24, {f:MONO, s:14, c:C.muted}); });
+  ctx.fillStyle = v >= 0 ? hexA(C.gold, .85) : hexA(C.red, .8);
+  const w = v * 180; ctx.fillRect(Math.min(1010, 1010 + w), y - 8, Math.abs(w), 16);
+  txt(fmt(v), 1190, y - 40, {f:MONO, s:22, al:'right', c:v >= 0 ? C.ink : C.red});
+  ctx.restore();
+}
+
+function sc5(t){
+  const x0 = 340, y0 = 190, cw = 140, ch = 95;
+  for (let i = 0; i < 4; i++){
+    const a = seg(t, .3 + i * .2, .9 + i * .2), cy = y0 + ch * i + ch / 2;
+    drawPhoto(KINDS[i], 290, cy, 70, a);
+    txt('I' + SUBD[i], 228, cy, {s:26, it:1, c:C.blue, a});
+    const cxx = x0 + cw * i + cw / 2, b = seg(t, .6 + i * .2, 1.2 + i * .2);
+    const nl = wrap(SENT[i], 128, {s:17, it:1}).length;
+    para(SENT[i], cxx, y0 - 18, 128, {s:17, it:1, c:C.gold, a:b}, 20, 'bottom');
+    txt('T' + SUBD[i], cxx, y0 - 18 - (nl - 1) * 20 - 32, {s:24, it:1, c:C.gold, a:b});
+  }
+  const ga = seg(t, 1.5, 2.5);
+  ctx.save(); ctx.strokeStyle = hexA(C.ink, .18 * ga); ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++){ line(x0 + cw * i, y0, x0 + cw * i, y0 + ch * 4); line(x0, y0 + ch * i, x0 + cw * 4, y0 + ch * i); }
+  ctx.restore();
+  const diagA = seg(t, 11, 12.5);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++){
+    const k = i * 4 + j, a = seg(t, 3 + k * .4, 3.35 + k * .4); if (a <= 0) continue;
+    const dim = i !== j ? 1 - .45 * diagA : 1;
+    ctx.save(); ctx.globalAlpha = a * dim; ctx.fillStyle = heat(M5[i][j]); ctx.fillRect(x0 + cw * j + 2, y0 + ch * i + 2, cw - 4, ch - 4); ctx.restore();
+    txt(fmt(M5[i][j]), x0 + cw * j + cw / 2, y0 + ch * i + ch / 2, {f:MONO, s:21, a:a * dim});
+  }
+  const k = Math.floor((t - 3) / .4);
+  const fa = seg(t, 3, 3.5) * (1 - seg(t, 9.6, 10.2));
+  if (k >= 0 && k < 16 && fa > 0){
+    const i = k >> 2, j = k & 3;
+    ctx.save(); ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.strokeRect(x0 + cw * j + 2, y0 + ch * i + 2, cw - 4, ch - 4); ctx.restore();
+  }
+  if (fa > 0){
+    const kk = clamp(k, 0, 15), i = kk >> 2, j = kk & 3;
+    txt(`I${SUBD[i]} · T${SUBD[j]}`, 1100, 330, {s:36, it:1, a:fa});
+    txt(`= ${fmt(M5[i][j])}`, 1100, 380, {f:MONO, s:26, a:fa});
+  }
+  write('N × N similarities', 1100, 230, seg(t, 3, 4.5), {s:26});
+  write('S = I Tᵀ ∈ ℝᴺˣᴺ', 1100, 268, seg(t, 3.5, 5), {s:22, it:1, c:C.muted});
+  for (let i = 0; i < 4; i++){
+    const a = seg(t, 10 + i * .3, 10.5 + i * .3); if (a <= 0) continue;
+    ctx.save(); ctx.globalAlpha = a; ctx.strokeStyle = C.green; ctx.lineWidth = 3.5; ctx.strokeRect(x0 + cw * i + 1, y0 + ch * i + 1, cw - 2, ch - 2); ctx.restore();
+  }
+  write('diagonal: 4 true pairs', 1100, 440, seg(t, 10.5, 11.5), {s:22, c:C.green});
+  write('off-diagonal: 12 mismatches', 1100, 476, seg(t, 11.2, 12.2), {s:22, c:C.red});
+  write('CLIP: N = 32,768 per batch', 1100, 560, seg(t, 12, 13), {s:20, c:C.muted, it:1});
+}
+
+const CX6 = [800, 920, 1040, 1160];
+function sc6(t){
+  const x0 = 200, y0 = 210, cw = 100, ch = 70, r = s6.r, ma = seg(t, 0, 1.2);
+  for (let i = 0; i < 4; i++){
+    drawPhoto(KINDS[i], 150, y0 + ch * i + ch / 2, 54, ma);
+    txt('T' + SUBD[i], x0 + cw * i + cw / 2, y0 - 22, {s:22, it:1, c:C.gold, a:ma});
+    for (let j = 0; j < 4; j++){
+      ctx.save(); ctx.globalAlpha = ma; ctx.fillStyle = heat(M6[i][j]); ctx.fillRect(x0 + cw * j + 2, y0 + ch * i + 2, cw - 4, ch - 4); ctx.restore();
+      txt(fmt(M6[i][j]), x0 + cw * j + cw / 2, y0 + ch * i + ch / 2, {f:MONO, s:17, a:ma});
+    }
+  }
+  const ra = seg(t, 2, 3);
+  if (ra > 0){ ctx.save(); ctx.globalAlpha = ra; ctx.strokeStyle = C.yellow; ctx.lineWidth = 3; ctx.strokeRect(x0 - 3, y0 + ch * r - 3, cw * 4 + 6, ch + 6); ctx.restore(); }
+  const cA = seg(t, 10, 11);
+  if (cA > 0){ ctx.save(); ctx.globalAlpha = cA; ctx.strokeStyle = C.yellow; ctx.setLineDash([7, 6]); ctx.lineWidth = 2.5; ctx.strokeRect(x0 + cw * r - 3, y0 - 3, cw + 6, ch * 4 + 6); ctx.restore(); }
+  write('each row: an image picks its caption', 400, 528, seg(t, 3, 4.5), {s:19, it:1, c:C.muted});
+  write('each column: a caption picks its image', 400, 556, seg(t, 10.3, 11.6), {s:19, it:1, c:C.muted});
+
+  const vals = M6[r], lg = vals.map(v => v / s6.tau), P = softmax(lg);
+  const a1 = seg(t, 3, 4.5), a2 = seg(t, 4.5, 6), a3 = seg(t, 5.5, 7.5);
+  txt(`I${SUBD[r]} · Tⱼ`, 712, 220, {s:24, it:1, al:'right', a:a1});
+  txt('÷ τ', 712, 288, {s:24, it:1, al:'right', a:a2});
+  txt('softmax', 712, 470, {s:22, it:1, al:'right', a:a3});
+  for (let j = 0; j < 4; j++){
+    const x = CX6[j];
+    txt(fmt(vals[j]), x, 220, {f:MONO, s:21, a:clamp(a1 * 4 - j)});
+    txt((lg[j] < 0 ? '−' : '') + Math.abs(lg[j]).toFixed(1), x, 288, {f:MONO, s:21, c:C.gold, a:clamp(a2 * 4 - j)});
+    if (a3 > 0){
+      const h = 190 * P[j] * a3;
+      ctx.save(); ctx.globalAlpha = a3; ctx.fillStyle = j === r ? C.green : hexA(C.blue, .45); ctx.fillRect(x - 32, 560 - h, 64, h); ctx.restore();
+      txt(P[j].toFixed(2), x, 560 - h - 16, {f:MONO, s:17, a:a3});
+      if (j === r) txt('correct', x, 560 - h - 40, {s:16, it:1, c:C.green, a:seg(t, 7, 8)});
+    }
+    para(SENT[j], x, 580, 112, {s:15, it:1, c:C.gold, a:a3}, 18);
+  }
+  if (a3 > 0){ ctx.save(); ctx.globalAlpha = a3; ctx.strokeStyle = hexA(C.ink, .5); ctx.lineWidth = 1.5; line(760, 560, 1200, 560); ctx.restore(); }
+  write(`loss = −log ${P[r].toFixed(2)} = ${(-Math.log(P[r])).toFixed(2)}`, 980, 662, seg(t, 8, 9.5), {s:26, it:1});
+  write(`L = ½ [ CE(rows) + CE(columns) ] = ${clipLoss(M6, s6.tau).toFixed(2)}`, 400, 626, seg(t, 13, 14.5), {s:23, it:1});
+  txt('click a row to choose another image', 400, 672, {s:16, it:1, c:C.blue, a:seg(t, 14, 15)});
+}
+
+function sc7(t){
+  const O = {x:380, y:390}, R = 170, u = clamp((t - 2) / 12), p = ease7(u), A = angles(p);
+  const tip = (a, r = R) => [O.x + r * Math.cos(a), O.y - r * Math.sin(a)];
+  const ca = seg(t, 0, 1);
+  ctx.save(); ctx.globalAlpha = ca; ctx.strokeStyle = hexA(C.ink, .3); ctx.lineWidth = 1; line(O.x - 240, O.y, O.x + 240, O.y); line(O.x, O.y - 240, O.x, O.y + 240);
+  ctx.strokeStyle = hexA(C.ink, .7); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(O.x, O.y, R, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  const pa = seg(t, 2, 3) * (1 - seg(t, 14, 15));
+  for (let i = 0; i < 4; i++){
+    const [a, b] = tip(A.I[i]), [c, d] = tip(A.T[i]);
+    ctx.save(); ctx.globalAlpha = pa * .9; ctx.strokeStyle = C.green; ctx.setLineDash([5, 5]); ctx.lineWidth = 2; line(a, b, c, d); ctx.restore();
+  }
+  const aa = seg(t, .5, 1.5);
+  for (let i = 0; i < 4; i++){
+    const [tx, ty] = tip(A.T[i]); arrow(O.x, O.y, tx, ty, {u:aa, c:C.gold, w:2.5, h:12});
+    const [lx, ly] = tip(A.T[i], R + 52), c = Math.cos(A.T[i]), s = Math.sin(A.T[i]);
+    const al = c > .35 ? 'left' : c < -.35 ? 'right' : 'center', anchor = al !== 'center' ? 'middle' : s > 0 ? 'bottom' : 'top';
+    para(SENT[i], lx, ly, 140, {s:16, it:1, c:C.gold, al, a:aa}, 19, anchor);
+  }
+  for (let i = 0; i < 4; i++){
+    const [ix, iy] = tip(A.I[i]); arrow(O.x, O.y, ix, iy, {u:aa, c:C.blue, w:3, h:13});
+    const [px, py] = tip(A.I[i], R + 24); drawPhoto(KINDS[i], px, py, 34, aa);
+  }
+  txt(`epoch ${Math.round(u * 32)} / 32`, 40, 60, {f:MONO, s:18, c:C.muted, al:'left'});
+
+  const M = simM(p), x0 = 820, y0 = 150, cw = 86, ch = 58;
+  for (let i = 0; i < 4; i++){
+    drawPhoto(KINDS[i], x0 - 30, y0 + ch * i + ch / 2, 40, ca);
+    txt('T' + SUBD[i], x0 + cw * i + cw / 2, y0 - 18, {s:20, it:1, c:C.gold, a:ca});
+    for (let j = 0; j < 4; j++){
+      ctx.save(); ctx.globalAlpha = ca; ctx.fillStyle = heat(M[i][j]); ctx.fillRect(x0 + cw * j + 2, y0 + ch * i + 2, cw - 4, ch - 4);
+      if (i === j){ ctx.strokeStyle = hexA(C.green, .9); ctx.lineWidth = 2; ctx.strokeRect(x0 + cw * j + 1, y0 + ch * i + 1, cw - 2, ch - 2); }
+      ctx.restore();
+      txt(fmt(M[i][j]), x0 + cw * j + cw / 2, y0 + ch * i + ch / 2, {f:MONO, s:15, a:ca});
+    }
+  }
+  const gx0 = 820, gx1 = 1164, gy0 = 460, gy1 = 620;
+  ctx.save(); ctx.globalAlpha = ca; ctx.strokeStyle = hexA(C.ink, .5); ctx.lineWidth = 1.5; line(gx0, gy0, gx0, gy1); line(gx0, gy1, gx1, gy1); ctx.restore();
+  txt('loss', gx0, gy0 - 18, {s:17, it:1, c:C.muted, al:'left', a:ca});
+  txt('0', gx0, gy1 + 20, {f:MONO, s:14, c:C.muted, a:ca});
+  txt('32 epochs', gx1, gy1 + 20, {f:MONO, s:14, c:C.muted, al:'right', a:ca});
+  const n = Math.round(u * 120);
+  const gp = k => [lerp(gx0, gx1, k / 120), gy1 - (LOSS[k] / LMAX) * (gy1 - gy0 - 10)];
+  ctx.save(); ctx.strokeStyle = C.yellow; ctx.lineWidth = 2.5; ctx.beginPath();
+  for (let k = 0; k <= n; k++){ const [x, y] = gp(k); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+  ctx.stroke(); const [ex, ey] = gp(n); ctx.fillStyle = C.yellow; ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  txt(LOSS[n].toFixed(2), ex + 10, ey - 16, {f:MONO, s:16, al:'left', a:ca});
+}
+
+const Y8 = [215, 295, 375, 455];
+function sc8(t){
+  const k = s8.k, sims = SIM8[k], P = softmax(sims.map(v => v * 100)), best = P.indexOf(Math.max(...P));
+  drawPhoto(k, 150, 300, 180, seg(t, 0, 1));
+  txt('a new photo', 150, 412, {s:18, it:1, c:C.muted, a:seg(t, .5, 1.5)});
+  arrow(150, 440, 150, 500, {u:seg(t, 3, 3.6), c:C.blue});
+  txt('image encoder', 166, 470, {s:15, it:1, c:C.muted, al:'left', a:seg(t, 3, 3.6)});
+  txt('I', 150, 528, {s:32, it:1, c:C.blue, a:seg(t, 3.3, 4)});
+  const pu = seg(t, 1.5, 3);
+  ctx.font = font({s:24}); const pw = ctx.measureText('a photo of a ').width;
+  for (let j = 0; j < 4; j++){
+    const wa = seg(t, .3 + j * .2, .9 + j * .2), wx = 300 + pw * pu;
+    write('a photo of a ', 300, Y8[j], pu, {s:24, al:'left'});
+    txt(WORDS[j], wx, Y8[j], {s:24, it:1, c:C.gold, al:'left', a:wa});
+    ctx.font = font({s:24, it:1}); const ww = ctx.measureText(WORDS[j]).width;
+    txt('.', wx + ww + 1, Y8[j], {s:24, al:'left', a:pu});
+    const ea = seg(t, 3.5 + j * .15, 4 + j * .15);
+    arrow(560, Y8[j], 620, Y8[j], {u:ea, c:C.gold, w:2});
+    txt('T' + SUBD[j], 650, Y8[j], {s:26, it:1, c:C.gold, a:ea});
+    txt(sims[j].toFixed(3), 790, Y8[j], {f:MONO, s:22, a:seg(t, 6.5 + j * .3, 7 + j * .3)});
+    const ba = seg(t, 10.3, 11.8);
+    if (ba > 0){
+      const w = 280 * P[j] * ba;
+      ctx.save(); ctx.fillStyle = j === best ? C.green : hexA(C.blue, .5); ctx.fillRect(880, Y8[j] - 13, Math.max(1.5, w), 26); ctx.restore();
+      txt((P[j] * 100).toFixed(1) + '%', 880 + w + 10, Y8[j], {f:MONO, s:18, al:'left', a:ba});
+    }
+  }
+  txt('text encoder', 590, 170, {s:15, it:1, c:C.muted, a:seg(t, 3.5, 4.2)});
+  write('I · Tⱼ', 790, 160, seg(t, 6, 7), {s:26, it:1});
+  write('softmax(100 · I · Tⱼ)', 1020, 160, seg(t, 10, 11), {s:22, it:1});
+  const ha = seg(t, 12, 13);
+  if (ha > 0){ ctx.save(); ctx.globalAlpha = ha; ctx.strokeStyle = C.green; ctx.lineWidth = 2; rbox(285, Y8[best] - 30, 975, 60, 8); ctx.stroke(); ctx.restore(); }
+  write(`Prediction: “a photo of a ${WORDS[best]}.”`, 760, 600, seg(t, 12.3, 13.8), {s:30});
+  txt('no dog, cat, car or plane labels were used in training', 760, 645, {s:18, it:1, c:C.muted, a:seg(t, 13.5, 14.5)});
+}
+
+const CODE = [
+  ['# image_encoder: ResNet or Vision Transformer', '', ''],
+  ['# text_encoder:  CBOW or Text Transformer', '', ''],
+  ['I_f = image_encoder(I)', '# [n, d_i]', 'scene 2'],
+  ['T_f = text_encoder(T)', '# [n, d_t]', 'scene 3'],
+  ['I_e = l2_normalize(np.dot(I_f, W_i), axis=1)', '# [n, d_e]', 'scene 2'],
+  ['T_e = l2_normalize(np.dot(T_f, W_t), axis=1)', '# [n, d_e]', 'scene 3'],
+  ['logits = np.dot(I_e, T_e.T) * np.exp(t)', '# [n, n]', 'scenes 4–5'],
+  ['labels = np.arange(n)', '', 'scene 5'],
+  ['loss_i = cross_entropy_loss(logits, labels, axis=0)', '', 'scene 6'],
+  ['loss_t = cross_entropy_loss(logits, labels, axis=1)', '', 'scene 6'],
+  ['loss   = (loss_i + loss_t) / 2', '', 'scene 6'],
+];
+const CODE_RE = /(\b(?:I_f|I_e|image_encoder|W_i|I)\b|\b(?:T_f|T_e|text_encoder|W_t|T)\b)/;
+function sc9(t){
+  ctx.font = `400 19px ${MONO}`; const cwid = ctx.measureText('M').width;
+  CODE.forEach(([code, cm, tag], i) => {
+    const y = 120 + i * 44, st = .5 + i * .7, n = Math.floor(code.length * clamp((t - st) / .65));
+    if (n <= 0) return;
+    let x = 90, pos = 0;
+    code.split(CODE_RE).forEach(piece => {
+      if (!piece) return;
+      const vis = piece.slice(0, Math.max(0, n - pos));
+      let c = C.ink;
+      if (code.startsWith('#')) c = C.muted;
+      else if (/^(I_f|I_e|image_encoder|W_i|I)$/.test(piece)) c = C.blue;
+      else if (/^(T_f|T_e|text_encoder|W_t|T)$/.test(piece)) c = C.gold;
+      if (vis) txt(vis, x, y, {f:MONO, s:19, c, al:'left'});
+      x += piece.length * cwid; pos += piece.length;
+    });
+    const da = seg(t, st + .6, st + 1);
+    if (cm) txt(cm, 800, y, {f:MONO, s:17, c:C.muted, al:'left', a:da});
+    if (tag) txt(tag, 1190, y, {s:18, it:1, c:C.yellow, al:'right', a:da});
+  });
+  write('encode  →  project  →  normalize  →  compare all pairs  →  symmetric cross-entropy', 640, 640, seg(t, 8.5, 10.5), {s:23, it:1});
+}
+
+/* ---------- the math: MathML per scene (ViT-B/32 shapes) ---------- */
+const mi = s => `<mi>${s}</mi>`, mu = s => `<mi mathvariant="normal">${s}</mi>`, mn = s => `<mn>${s}</mn>`, mo = s => `<mo>${s}</mo>`, mt = s => `<mtext>${s}</mtext>`;
+const mr = (...a) => `<mrow>${a.join('')}</mrow>`, sb = (a, b) => `<msub>${a}${b}</msub>`, sp = (a, b) => `<msup>${a}${b}</msup>`, ssp = (a, b, c) => `<msubsup>${a}${b}${c}</msubsup>`;
+const fr = (a, b) => `<mfrac>${a}${b}</mfrac>`, sq = a => `<msqrt>${a}</msqrt>`, uo = (a, b, c) => `<munderover>${a}${b}${c}</munderover>`, un = (a, b) => `<munder>${a}${b}</munder>`;
+const hat = a => `<mover accent="true">${a}<mo>^</mo></mover>`, P = (...a) => mr(mo('('), ...a, mo(')')), Bk = (...a) => mr(mo('['), ...a, mo(']'));
+const sp_ = mt(' '), comma = mo(','), eq = mo('='), inn = mo('∈'), times = mo('×');
+const RR = (...d) => sp(mi('ℝ'), mr(...d.flatMap((x, i) => i ? [mo('×'), typeof x === 'number' ? mn(x) : x] : [typeof x === 'number' ? mn(x) : x])));
+const SUM = (lo, hi) => hi === '' ? un(mo('∑'), lo) : uo(mo('∑'), lo, hi);
+const nrm = a => mr(mo('‖'), a, mo('‖'));
+const M = (...a) => `<math display="block">${mr(...a)}</math>`;
+const Ii = sb(mi('I'), mi('i')), Ti = sb(mi('T'), mi('i')), Tj = sb(mi('T'), mi('j')), Sij = sb(mi('S'), mr(mi('i'), mi('j'))), tau = mi('τ');
+const softmaxQK = (extra = '') => mr(mi('softmax'), P(fr(mr(mi('Q'), sp(mi('K'), mi('⊤'))), sq(mn(64))), extra), mi('V'));
+
+const MATH = [
+  [ // 1 · two kinds of data
+    {f:[M(mi('x'), inn, RR(3, 224, 224))], n:'An image is 3 colour channels × 224 × 224 pixels: <b>150,528</b> numbers.'},
+    {f:[M(sb(hat(mi('x')), mi('c')), eq, fr(mr(sb(mi('x'), mi('c')), mo('/'), mn(255), mo('−'), sb(mi('μ'), mi('c'))), sb(mi('σ'), mi('c'))))], n:'Each channel is normalized with fixed statistics: μ = (0.481, 0.458, 0.408), σ = (0.269, 0.261, 0.276).'},
+    {f:[M(mi('t'), eq, P(sb(mi('t'), mn(1)), comma, mo('…'), comma, sb(mi('t'), mi('L'))), comma, sp_, sb(mi('t'), mi('k')), inn, mr(mo('{'), mn(0), comma, mo('…'), comma, mn(49407), mo('}')), comma, sp_, mi('L'), mo('≤'), mn(77))], n:'A sentence is byte-pair-encoded into token ids from a <b>49,408</b>-entry vocabulary, wrapped in [SOS] = 49406 and [EOS] = 49407, padded to 77.'},
+    {f:[M(mi('f'), mo(':'), RR(3, 224, 224), mo('→'), sp(mi('𝕊'), mn(511)), comma, sp_, mi('g'), mo(':'), mt('tokens'), mo('→'), sp(mi('𝕊'), mn(511)))], n:'CLIP learns two functions that land on the same unit sphere 𝕊⁵¹¹ = { u ∈ ℝ⁵¹² : ‖u‖ = 1 }.'},
+  ],
+  [ // 2 · image encoder
+    {f:[M(mi('N'), eq, sp(P(fr(mn(224), mn(32))), mn(2)), eq, mn(49), comma, sp_, sb(mi('p'), mi('i')), inn, RR(mn('3·32·32')), eq, sp(mi('ℝ'), mn(3072)))], n:'A 7 × 7 grid of 32-pixel patches, each flattened to 3,072 values.'},
+    {f:[M(sb(mi('z'), mi('i')), eq, mi('E'), sb(mi('p'), mi('i')), comma, sp_, mi('E'), inn, RR(768, 3072))], n:'Patch embedding: a 32 × 32 convolution with stride 32 and no bias. <b>2.36 M</b> parameters.'},
+    {f:[M(sb(mi('Z'), mn(0)), eq, sb(mi('LN'), mt('pre')), P(Bk(sb(mi('x'), mt('cls')), mo(';'), sb(mi('z'), mn(1)), mo(';'), mo('…'), mo(';'), sb(mi('z'), mn(49))), mo('+'), sb(mi('E'), mt('pos'))), inn, RR(50, 768))], n:'A learned [CLS] vector is prepended and a learned position embedding E<sub>pos</sub> ∈ ℝ<sup>50×768</sup> is added.'},
+    {f:[M(mi('Attn'), P(mi('Q'), comma, mi('K'), comma, mi('V')), eq, softmaxQK()), M(mi('Q'), eq, mi('X'), sb(mi('W'), mi('Q')), comma, sp_, sb(mi('W'), mi('Q')), comma, sb(mi('W'), mi('K')), comma, sb(mi('W'), mi('V')), inn, RR(768, 768))], n:'Self-attention on X = LN(Z). 12 heads of width 64 run in parallel; their outputs are concatenated and mixed by W<sub>O</sub> ∈ ℝ<sup>768×768</sup>. Every one of the 50 tokens attends to all 50.'},
+    {f:[M(mi('Z′'), eq, sb(mi('Z'), mi('ℓ')), mo('+'), mi('MHSA'), P(sb(mi('LN'), mn(1)), P(sb(mi('Z'), mi('ℓ'))))), M(sb(mi('Z'), mr(mi('ℓ'), mo('+'), mn(1))), eq, mi('Z′'), mo('+'), sb(mi('W'), mn(2)), mi('ϕ'), P(sb(mi('W'), mn(1)), sb(mi('LN'), mn(2)), P(mi('Z′')), mo('+'), sb(mi('b'), mn(1))), mo('+'), sb(mi('b'), mn(2)))], n:'One of <b>12</b> pre-norm residual blocks. W<sub>1</sub> ∈ ℝ<sup>3072×768</sup>, W<sub>2</sub> ∈ ℝ<sup>768×3072</sup>, and ϕ(u) = u · σ(1.702u) (QuickGELU). <b>7.09 M</b> parameters per block.'},
+    {f:[M(mi('h'), eq, sb(mi('LN'), mt('post')), P(sb(mi('Z'), mn(12)), Bk(mn(0))), inn, sp(mi('ℝ'), mn(768)), comma, sp_, mi('I'), eq, fr(mr(sb(mi('W'), mi('i')), mi('h')), nrm(mr(sb(mi('W'), mi('i')), mi('h')))), comma, sp_, sb(mi('W'), mi('i')), inn, RR(512, 768))], n:'Read out the [CLS] token, project to 512 dimensions, divide by the length. Image encoder total: <b>87.8 M</b> parameters.'},
+  ],
+  [ // 3 · text encoder
+    {f:[M(sb(mi('X'), mn(0)), eq, sb(mi('W'), mt('tok')), Bk(mi('t')), mo('+'), sb(mi('E'), mt('pos')), inn, RR(77, 512), comma, sp_, sb(mi('W'), mt('tok')), inn, RR(49408, 512))], n:'Look up each token’s 512-d embedding (<b>25.3 M</b> parameters on its own) and add a learned position embedding.'},
+    {f:[M(mi('Attn'), eq, softmaxQK(mr(mo('+'), mi('M')))), M(sb(mi('M'), mr(mi('i'), mi('j'))), eq, mn(0), mt(' if '), mi('j'), mo('≤'), mi('i'), comma, sp_, mo('−'), mi('∞'), mt(' if '), mi('j'), mo('>'), mi('i'))], n:'Causal mask: each token sees only itself and earlier tokens. 8 heads × 64 = 512 wide.'},
+    {f:[M(mn(12), mt(' blocks'), comma, sp_, sb(mi('W'), mn(1)), inn, RR(2048, 512), comma, sp_, sb(mi('W'), mn(2)), inn, RR(512, 2048))], n:'Same pre-norm block as the image side, at width 512 with a 2,048-wide MLP. <b>3.15 M</b> parameters per block.'},
+    {f:[M(mi('u'), eq, sb(mi('LN'), mt('final')), P(sb(mi('X'), mn(12)), Bk(mi('eos'))), inn, sp(mi('ℝ'), mn(512)), comma, sp_, mi('T'), eq, fr(mr(sb(mi('W'), mi('t')), mi('u')), nrm(mr(sb(mi('W'), mi('t')), mi('u')))), comma, sp_, sb(mi('W'), mi('t')), inn, RR(512, 512))], n:'eos is the position of token 49407, the only position that has seen the whole sentence. Text encoder total: <b>63.4 M</b> parameters.'},
+  ],
+  [ // 4 · shared space
+    {f:[M(nrm(mi('I')), eq, nrm(mi('T')), eq, mn(1), comma, sp_, mi('I'), comma, mi('T'), inn, sp(mi('𝕊'), mn(511)), mo('⊂'), sp(mi('ℝ'), mn(512)))], n:'After normalization only direction is left; length carries no information.'},
+    {f:[M(mi('sim'), P(mi('I'), comma, mi('T')), eq, mi('I'), mo('·'), mi('T'), eq, SUM(mr(mi('k'), mo('='), mn(1)), mn(512)), sb(mi('I'), mi('k')), sb(mi('T'), mi('k')), eq, mi('cos'), mi('θ'), inn, Bk(mo('−'), mn(1), comma, mn(1)))], n:'The similarity score is a plain dot product of two 512-number vectors.'},
+    {f:[M(sp(nrm(mr(mi('I'), mo('−'), mi('T'))), mn(2)), eq, mn(2), mo('−'), mn(2), mi('cos'), mi('θ'))], n:'So ranking by cosine is the same as ranking by straight-line distance on the sphere.'},
+  ],
+  [ // 5 · batch
+    {f:[M(mi('I'), comma, mi('T'), inn, RR(mi('N'), 512))], n:'Stack the batch: row i of <b>I</b> is image i, row i of <b>T</b> is its caption. Every row has length 1.'},
+    {f:[M(mi('S'), eq, mi('I'), sp(mi('T'), mi('⊤')), inn, RR(mi('N'), mi('N')), comma, sp_, Sij, eq, Ii, mo('·'), Tj)], n:'One matrix multiply gives all N² scores. The diagonal holds the true pairs.'},
+    {f:[M(mi('logits'), eq, fr(mi('S'), tau), eq, mi('S'), mo('·'), sp(mi('e'), mi('t')), comma, sp_, sp(mi('e'), sb(mi('t'), mn(0))), eq, fr(mn(1), mn('0.07')), mo('≈'), mn('14.3'), comma, sp_, sp(mi('e'), mi('t')), mo('≤'), mn(100))], n:'τ is a learned temperature, stored as log-scale t and clipped so the scale never exceeds 100.'},
+    {f:[M(mi('N'), eq, mn('32,768'), mo('⇒'), sp(mi('N'), mn(2)), mo('≈'), mn('1.07'), times, sp(mn(10), mn(9)), mt(' scores'))], n:'Per batch: N positives and N² − N negatives, without collecting any extra data.'},
+  ],
+  [ // 6 · loss
+    {f:[M(sb(mi('p'), mr(mi('i'), mi('j'))), eq, fr(mr(mi('exp'), P(Sij, mo('/'), tau)), mr(SUM(mr(mi('k'), mo('='), mn(1)), mi('N')), mi('exp'), P(sb(mi('S'), mr(mi('i'), mi('k'))), mo('/'), tau))))], n:'Softmax along row i: image i’s probability distribution over the N captions.'},
+    {f:[M(ssp(mi('ℓ'), mi('i'), mr(mi('I'), mo('→'), mi('T'))), eq, mo('−'), mi('log'), sb(mi('p'), mr(mi('i'), mi('i'))), comma, sp_, ssp(mi('ℓ'), mi('j'), mr(mi('T'), mo('→'), mi('I'))), eq, mo('−'), mi('log'), fr(mr(mi('exp'), P(sb(mi('S'), mr(mi('j'), mi('j'))), mo('/'), tau)), mr(SUM(mi('k'), ''), mi('exp'), P(sb(mi('S'), mr(mi('k'), mi('j'))), mo('/'), tau))))], n:'Cross-entropy toward the diagonal, once per row (image → text) and once per column (text → image).'},
+    {f:[M(mi('L'), eq, fr(mn(1), mr(mn(2), mi('N'))), SUM(mr(mi('i'), mo('='), mn(1)), mi('N')), P(ssp(mi('ℓ'), mi('i'), mr(mi('I'), mo('→'), mi('T'))), mo('+'), ssp(mi('ℓ'), mi('i'), mr(mi('T'), mo('→'), mi('I')))))], n:'The symmetric contrastive (InfoNCE) loss. It reaches 0 only when every diagonal probability is 1 in both directions.'},
+    {f:[M(fr(mr(mo('∂'), ssp(mi('ℓ'), mi('i'), mr(mi('I'), mo('→'), mi('T')))), mr(mo('∂'), Sij)), eq, fr(mr(sb(mi('p'), mr(mi('i'), mi('j'))), mo('−'), sb(mi('𝟙'), Bk(mi('i'), mo('='), mi('j')))), tau))], n:'The gradient on each score is “predicted minus target”: push the diagonal up and every other score down in proportion to the probability it took.'},
+  ],
+  [ // 7 · training
+    {f:[M(fr(mr(mo('∂'), ssp(mi('ℓ'), mi('i'), mr(mi('I'), mo('→'), mi('T')))), mr(mo('∂'), Ii)), eq, fr(mn(1), tau), P(SUM(mi('j'), ''), sb(mi('p'), mr(mi('i'), mi('j'))), Tj, mo('−'), Ti))], n:'For the image vector (before the normalization’s Jacobian): move toward its own caption T<sub>i</sub> and away from the probability-weighted average of all captions. That is the pull and the push.'},
+    {f:[M(mi('θ'), mo('←'), mi('AdamW'), P(mi('θ'), comma, sb(mo('∇'), mi('θ')), mi('L')), comma, sp_, mi('θ'), eq, mr(mo('{'), mt('ViT, text Transformer, '), sb(mi('W'), mi('i')), comma, sb(mi('W'), mi('t')), comma, mi('t'), mo('}')))], n:'Everything trains together from scratch. ViT-B/32: learning rate 5 × 10⁻⁴ with cosine decay, β = (0.9, 0.98), ε = 10⁻⁶, weight decay 0.2, 2,000 warm-up steps.'},
+    {f:[M(fr(mr(mn('400 M'), times, mn(32)), mn('32,768')), mo('≈'), mn('390,625'), mt(' steps'))], n:'400 million image–caption pairs, 32 epochs, 32,768 pairs per step.'},
+  ],
+  [ // 8 · zero-shot
+    {f:[M(sb(mi('T'), mi('c')), eq, fr(mr(mi('g'), P(mt('“a photo of a {c}.”'))), nrm(mo('·'))), comma, sp_, mi('W'), eq, Bk(sb(mi('T'), mn(1)), mo(';'), mo('…'), mo(';'), sb(mi('T'), mi('K'))), inn, RR(mi('K'), 512))], n:'Encode one prompt per class, once. The stacked prompts W are a linear classifier written in English.'},
+    {f:[M(mi('p'), P(mi('y'), mo('='), mi('c'), mo('|'), mi('x')), eq, fr(mr(mi('exp'), P(mn(100), mo('·'), mi('I'), mo('·'), sb(mi('T'), mi('c')))), mr(SUM(mr(mi('k'), mo('='), mn(1)), mi('K')), mi('exp'), P(mn(100), mo('·'), mi('I'), mo('·'), sb(mi('T'), mi('k'))))))], n:'100 is the learned scale e<sup>t</sup> at the end of training (τ = 0.01).'},
+    {f:[M(hat(mi('y')), eq, un(mi('argmax'), mi('c')), mi('I'), mo('·'), sb(mi('T'), mi('c')), comma, sp_, mi('logits'), eq, mn(100), mi('W'), mi('I'), inn, sp(mi('ℝ'), mi('K')))], n:'Classifying an image is one matrix–vector product.'},
+    {f:[M(sb(mi('T'), mi('c')), eq, mi('normalize'), P(fr(mn(1), mi('M')), SUM(mr(mi('m'), mo('='), mn(1)), mi('M')), mi('g'), P(sb(mi('template'), mi('m')), P(mi('c')))))], n:'Prompt ensembling: the paper averages M = 80 templates for ImageNet, which adds about 3.5 points of accuracy.'},
+  ],
+];
+const SHAPES = `<table class="shapes"><thead><tr><th>Tensor</th><th>Shape</th><th>Where</th></tr></thead><tbody>
+<tr><td>I (images)</td><td>[n, 224, 224, 3]</td><td>input</td></tr>
+<tr><td>T (tokens)</td><td>[n, 77]</td><td>input</td></tr>
+<tr><td>I_f</td><td>[n, 768] (d_i = 768)</td><td>ViT [CLS] output</td></tr>
+<tr><td>T_f</td><td>[n, 512] (d_t = 512)</td><td>text [EOS] output</td></tr>
+<tr><td>W_i, W_t</td><td>[768, 512], [512, 512]</td><td>projections</td></tr>
+<tr><td>I_e, T_e</td><td>[n, 512] (d_e = 512)</td><td>shared space, unit rows</td></tr>
+<tr><td>logits</td><td>[n, n]</td><td>scaled cosines</td></tr>
+<tr><td>parameters</td><td>87.8 M + 63.4 M + 1 = 151.3 M</td><td>image + text + t</td></tr></tbody></table>`;
+MATH.push([
+  {f:[M(mi('L'), eq, fr(mn(1), mn(2)), Bk(sb(mi('CE'), mt('rows')), P(sp(mi('e'), mi('t')), sb(mi('I'), mi('e')), sp(sb(mi('T'), mi('e')), mi('⊤'))), mo('+'), sb(mi('CE'), mt('cols')), P(sp(mi('e'), mi('t')), sb(mi('I'), mi('e')), sp(sb(mi('T'), mi('e')), mi('⊤')))))], n:'The whole objective in one line. In the code, cross_entropy_loss along axis=0 and axis=1.'},
+  {html:SHAPES, n:'Shapes in the pseudocode, for ViT-B/32 with a batch of n pairs.'},
+]);
+let mathOpen = true;
+function renderMath(){
+  const box = document.getElementById('eqs'), list = MATH[idx] || [];
+  box.hidden = !mathOpen;
+  if (!mathOpen) return;
+  box.innerHTML = list.map(e => `<div class="eq">${e.html ? `<div class="f">${e.html}</div>` : `<div class="f">${e.f.join('')}</div>`}<p>${e.n}</p></div>`).join('');
+}
+document.getElementById('math-toggle').addEventListener('click', e => {
+  mathOpen = !mathOpen; e.target.textContent = mathOpen ? 'Hide' : 'Show'; e.target.setAttribute('aria-expanded', String(mathOpen)); renderMath();
+});
+
+const SCENES = [
+  {title:'Two kinds of data', sum:'Pixels and words share nothing at first.', dur:13, draw:sc1, cues:[
+    [0, 'A computer sees a photo as a grid of pixel values, and a sentence as a sequence of word pieces called tokens.'],
+    [4, 'These are different kinds of data. Nothing in the raw numbers says whether this caption describes this picture.'],
+    [9, 'CLIP (Contrastive Language–Image Pre-training, OpenAI, 2021) learns to map both into one shared space, where that question becomes simple geometry.']]},
+  {title:'The image encoder', sum:'Patches in, one 512-number vector out.', dur:15, draw:sc2, cues:[
+    [0, 'Step one: the image goes through an image encoder. The Vision Transformer version cuts the picture into square patches.'],
+    [4, 'Each patch becomes a token. Stacked transformer layers let every patch exchange information with every other patch.'],
+    [9, 'Out comes one feature vector that summarizes the whole picture: 768 numbers for ViT-B/32.'],
+    [11, 'A learned matrix <i>W</i><sub>i</sub> projects it into the shared 512-dimensional space, and it is rescaled to length 1. Call the result <i>I</i>.']]},
+  {title:'The text encoder', sum:'Tokens in, read out at the end token.', dur:15, draw:sc3, cues:[
+    [0, 'Step two: the caption goes through a text encoder, which is also a Transformer.'],
+    [2, 'The sentence is split into tokens, and start and end markers are added.'],
+    [7, 'After the transformer layers, the vector at the end-of-sequence token is taken as the summary of the whole sentence.'],
+    [9, 'Another learned matrix <i>W</i><sub>t</sub> projects it into the same 512-dimensional space, scaled to length 1. Call it <i>T</i>.']]},
+  {title:'One shared space', sum:'Similarity is the cosine of the angle.', dur:14, draw:sc4, cues:[
+    [0, 'Now both vectors live in one space. The real space has 512 dimensions; we draw two.'],
+    [2, 'Every vector has length 1, so each one is a point on the unit sphere. Only its direction carries meaning.'],
+    [6, 'Similarity is the dot product <i>I · T</i>. For unit vectors that equals cos <i>θ</i>: near 1 when they point the same way, near 0 when unrelated, negative when opposed.'],
+    [10, 'Training aims to make a matching caption point close to its image, and other captions point elsewhere. Drag on the left to rotate <i>I</i> and watch both scores change.']]},
+  {title:'A batch of pairs', sum:'Compare every image with every caption.', dur:14, draw:sc5, cues:[
+    [0, 'Training uses batches of image–caption pairs collected from the web. CLIP saw 400 million pairs, in batches of <i>N</i> = 32,768.'],
+    [3, 'Every image in the batch is compared with every caption, giving an <i>N</i> × <i>N</i> grid of similarity scores. Before training, these scores are close to random.'],
+    [10, 'Only the diagonal holds true pairs. Every other cell is a mismatch, so each batch supplies <i>N</i>² − <i>N</i> negative examples for free.']]},
+  {title:'The contrastive loss', sum:'Softmax each row and column toward the diagonal.', dur:16, draw:sc6, cues:[
+    [0, 'To push the diagonal up and everything else down, treat each row as a classification problem.'],
+    [3, 'Take image 1’s row of scores, divide by a temperature <i>τ</i>, and apply softmax. The scores become probabilities over the <i>N</i> captions.'],
+    [7, 'The correct answer is the diagonal caption. The loss for this row is −log of its probability, which is cross-entropy.'],
+    [10, 'Do the same down each column, so every caption must also pick out its own image. CLIP averages the two directions.'],
+    [13, 'Click a row to choose another image, and move the <i>τ</i> slider. A small <i>τ</i> sharpens the softmax. CLIP learns <i>τ</i> during training, starting from 0.07.']]},
+  {title:'Training', sum:'Pull pairs together, push the rest apart.', dur:18, draw:sc7, cues:[
+    [0, 'Gradient descent on this loss updates both encoders and both projections together.'],
+    [2, 'Matched pairs are pulled together. Mismatched pairs are pushed apart.'],
+    [8, 'As training goes on, the diagonal of the similarity grid lights up and the loss falls.'],
+    [14, 'Dog and cat end up nearer each other than either is to car. That structure comes from the captions alone, with no class labels.']]},
+  {title:'Zero-shot classification', sum:'Classes become prompts; the best match wins.', dur:15, draw:sc8, cues:[
+    [0, 'After training, CLIP can sort images into categories it was never given as labels. This is zero-shot classification.'],
+    [1.5, 'Write each class name into a prompt such as “a photo of a dog.” and encode every prompt with the text encoder.'],
+    [6, 'Encode the image and take its dot product with each prompt. Real scores are small, around 0.2 to 0.3, because the space has 512 dimensions.'],
+    [10, 'Multiply by CLIP’s learned scale of 100 and apply softmax. The best-matching prompt is the prediction. Pick another image below; new classes only need new prompts.']]},
+  {title:'The whole recipe', sum:'The training step in eleven lines.', dur:12, draw:sc9, cues:[
+    [0, 'The whole training step fits in a few lines. This follows the pseudocode in the CLIP paper.'],
+    [8.5, 'Encode, project, normalize, compare every pair, and apply a symmetric cross-entropy that rewards the diagonal.']]},
+];
+
+/* ---------- player ---------- */
+const $ = id => document.getElementById(id);
+const capEl = $('caption'), nowEl = $('now'), playBtn = $('play'), startBtn = $('start');
+const ICON_PLAY = '<svg viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>';
+const ICON_NEXT = '<svg viewBox="0 0 16 16"><path d="M2 2l7 6-7 6zM9 2l7 6-7 6z"/></svg>';
+let idx = 0, t = SCENES[0].dur, playing = false, lastTs = null, lastCue = null;
+
+const tl = $('timeline'), chOl = $('chapters');
+const segs = SCENES.map((s, i) => {
+  const b = document.createElement('button'); b.className = 'seg'; b.type = 'button';
+  b.setAttribute('aria-label', `Scene ${i + 1}: ${s.title}`); b.innerHTML = '<i><b></b></i>';
+  b.addEventListener('click', e => {
+    const r = b.getBoundingClientRect(), f = clamp((e.clientX - r.left) / r.width);
+    go(i, i === idx ? f * s.dur : 0);
+  });
+  tl.appendChild(b); return b.querySelector('b');
+});
+const chBtns = SCENES.map((s, i) => {
+  const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
+  b.innerHTML = `<span class="n">SCENE ${i + 1}</span><span class="t">${s.title}</span><span class="s">${s.sum}</span>`;
+  b.addEventListener('click', () => { go(i, 0); cv.scrollIntoView({behavior: RM ? 'auto' : 'smooth', block:'center'}); });
+  li.appendChild(b); chOl.appendChild(li); return b;
+});
+const pick = $('pick');
+KINDS.forEach(k => {
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = k; b.setAttribute('aria-pressed', String(k === s8.k));
+  b.addEventListener('click', () => { s8.k = k; pick.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); if (t < 10.3) { t = SCENES[7].dur; playing = false; ui(); } });
+  pick.appendChild(b);
+});
+$('tau').addEventListener('input', e => { s6.tau = +e.target.value; $('tau-out').textContent = s6.tau.toFixed(2); });
+
+function go(i, t0 = 0){
+  idx = clamp(i, 0, SCENES.length - 1); t = RM ? SCENES[idx].dur : t0; playing = !RM; lastCue = null; startBtn.hidden = true; ui();
+}
+function togglePlay(){
+  startBtn.hidden = true;
+  const sc = SCENES[idx];
+  if (t >= sc.dur){ if (idx < SCENES.length - 1) go(idx + 1); else go(0); return; }
+  playing = !playing; ui();
+}
+function ui(){
+  const sc = SCENES[idx], ended = t >= sc.dur;
+  playBtn.innerHTML = playing ? ICON_PAUSE : ended ? ICON_NEXT : ICON_PLAY;
+  playBtn.setAttribute('aria-label', playing ? 'Pause' : ended ? 'Next scene' : 'Play');
+  nowEl.innerHTML = `Scene <b>${idx + 1}</b> / ${SCENES.length} · ${sc.title}`;
+  renderMath();
+  chBtns.forEach((b, i) => i === idx ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current'));
+  $('ctrl-tau').hidden = idx !== 5; $('ctrl-img').hidden = idx !== 7;
+  cv.style.touchAction = idx === 3 ? 'none' : 'auto';
+  cv.style.cursor = idx === 3 ? 'grab' : idx === 5 ? 'pointer' : 'default';
+}
+startBtn.addEventListener('click', () => go(0, 0));
+playBtn.addEventListener('click', togglePlay);
+$('prev').addEventListener('click', () => (t > 1.5 && !RM) ? go(idx, 0) : go(idx - 1));
+$('next').addEventListener('click', () => go(idx + 1));
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === ' ' && e.target.tagName === 'BUTTON') return;
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+  else if (e.key === 'ArrowRight') go(idx + 1);
+  else if (e.key === 'ArrowLeft') go(idx - 1);
+});
+
+let dragging = false;
+function toCanvas(e){ const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
+cv.addEventListener('pointerdown', e => {
+  const [x, y] = toCanvas(e);
+  if (idx === 3 && x < 760){ dragging = true; cv.setPointerCapture(e.pointerId); s4.aI = Math.atan2(385 - y, x - 400); t = SCENES[3].dur; playing = false; ui(); }
+  if (idx === 5 && x >= 200 && x <= 600 && y >= 210 && y <= 490){ s6.r = clamp(Math.floor((y - 210) / 70), 0, 3); t = SCENES[5].dur; playing = false; ui(); }
+});
+cv.addEventListener('pointermove', e => { if (!dragging) return; const [x, y] = toCanvas(e); s4.aI = Math.atan2(385 - y, x - 400); });
+cv.addEventListener('pointerup', () => dragging = false);
+cv.addEventListener('pointercancel', () => dragging = false);
+
+function render(){
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const pw = Math.max(1, Math.round(r.width * dpr)), ph = Math.max(1, Math.round(r.height * dpr));
+  if (cv.width !== pw || cv.height !== ph){ cv.width = pw; cv.height = ph; }
+  ctx.setTransform(pw / W, 0, 0, ph / H, 0, 0);
+  ctx.globalAlpha = 1; ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+  const sc = SCENES[idx];
+  ctx.save(); ctx.globalAlpha = RM ? 1 : seg(t, 0, .35); sc.draw(t); ctx.restore();
+  let cue = sc.cues[0][1]; for (const [ct, s] of sc.cues) if (t >= ct) cue = s;
+  if (cue !== lastCue){ capEl.innerHTML = cue; lastCue = cue; }
+  segs.forEach((b, i) => b.style.width = (i < idx ? 100 : i > idx ? 0 : 100 * t / sc.dur) + '%');
+}
+function loop(ts){
+  const dt = lastTs == null ? 0 : Math.min(.1, (ts - lastTs) / 1000); lastTs = ts;
+  if (playing){ t += dt; if (t >= SCENES[idx].dur){ t = SCENES[idx].dur; playing = false; ui(); } }
+  render(); requestAnimationFrame(loop);
+}
+ui(); requestAnimationFrame(loop);
+if (document.fonts) ['400 28px "STIX Two Text"', 'italic 400 28px "STIX Two Text"', '400 18px "JetBrains Mono"'].forEach(f => document.fonts.load(f).catch(() => {}));
+})();
+</script>
+
+</body></html>
